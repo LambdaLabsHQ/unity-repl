@@ -1,0 +1,18 @@
+# IDE
+.vs/
+.idea/
+*.csproj
+*.sln
+*.suo
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Unity meta files for root items are fine, but ignore Library etc if tested in Unity
+Library/
+Temp/
+Logs/
+obj/
+Build/
