@@ -57,7 +57,7 @@ namespace NativeMcp.Editor.Protocol
                         result = new JObject();
                         break;
                     case "tools/list":
-                        result = HandleToolsList();
+                        result = await HandleToolsListAsync(ct);
                         break;
                     case "tools/call":
                         result = await HandleToolsCallAsync(request.Params, ct);
@@ -146,9 +146,9 @@ namespace NativeMcp.Editor.Protocol
             }
         }
 
-        private JToken HandleToolsList()
+        private async Task<JToken> HandleToolsListAsync(CancellationToken ct)
         {
-            var tools = _toolBridge.GetMcpToolDefinitions();
+            var tools = await _toolBridge.GetMcpToolDefinitionsAsync(ct);
             var result = new McpToolsListResult { Tools = tools };
             return JToken.FromObject(result);
         }

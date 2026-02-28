@@ -40,18 +40,24 @@ namespace NativeMcp.Editor.Bridge
 
         /// <summary>
         /// Discover all enabled tools and convert them to MCP tool definitions.
+        /// Must be marshaled to main thread because ToolDiscoveryService accesses EditorPrefs.
         /// </summary>
-        public List<McpToolDefinition> GetMcpToolDefinitions()
+        public async Task<List<McpToolDefinition>> GetMcpToolDefinitionsAsync(CancellationToken ct)
         {
-            var enabledTools = _discovery.GetEnabledTools();
-            var definitions = new List<McpToolDefinition>(enabledTools.Count);
-
-            foreach (var tool in enabledTools)
+            var result = await RunOnMainThreadAsync(() =>
             {
-                definitions.Add(ConvertToMcpTool(tool));
-            }
+                var enabledTools = _discovery.GetEnabledTools();
+                var definitions = new List<McpToolDefinition>(enabledTools.Count);
 
-            return definitions;
+                foreach (var tool in enabledTools)
+                {
+                    definitions.Add(ConvertToMcpTool(tool));
+                }
+
+                return Task.FromResult<object>(definitions);
+            }, ct);
+
+            return (List<McpToolDefinition>)result;
         }
 
         /// <summary>
