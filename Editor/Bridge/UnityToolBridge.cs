@@ -95,7 +95,9 @@ namespace NativeMcp.Editor.Bridge
         }
 
         /// <summary>
-        /// Marshal a function that returns Task&lt;object&gt; to the Unity main thread.
+        /// Marshal a function that returns Task&lt;object&gt; to the Unity main thread
+        /// using EditorApplication.update, which is the proven approach for
+        /// background→main thread marshaling in Unity Editor.
         /// </summary>
         private static async Task<object> RunOnMainThreadAsync(
             Func<Task<object>> func, CancellationToken ct)
@@ -110,46 +112,34 @@ namespace NativeMcp.Editor.Bridge
 
             using (ct.Register(() => tcs.TrySetCanceled(ct)))
             {
-                // Post to the Unity main thread via SynchronizationContext
-                if (_mainThreadContext != null)
+                // Schedule execution on Unity main thread via EditorApplication.update
+                void OnUpdate()
                 {
-                    _mainThreadContext.Post(async _ =>
+                    EditorApplication.update -= OnUpdate;
+
+                    try
                     {
-                        try
+                        // Start the async operation on the main thread
+                        var task = func();
+                        task.ContinueWith(t =>
                         {
-                            var result = await func();
-                            tcs.TrySetResult(result);
-                        }
-                        catch (Exception ex)
-                        {
-                            tcs.TrySetException(ex);
-                        }
-                    }, null);
-                }
-                else
-                {
-                    // Fallback: schedule on EditorApplication.update
-                    void OnUpdate()
-                    {
-                        EditorApplication.update -= OnUpdate;
-                        Task.Run(async () =>
-                        {
-                            try
-                            {
-                                // This isn't perfect but serves as a fallback
-                                var result = await func();
-                                tcs.TrySetResult(result);
-                            }
-                            catch (Exception ex)
-                            {
-                                tcs.TrySetException(ex);
-                            }
+                            if (t.IsFaulted)
+                                tcs.TrySetException(t.Exception.InnerExceptions);
+                            else if (t.IsCanceled)
+                                tcs.TrySetCanceled();
+                            else
+                                tcs.TrySetResult(t.Result);
                         });
                     }
-                    EditorApplication.update += OnUpdate;
+                    catch (Exception ex)
+                    {
+                        tcs.TrySetException(ex);
+                    }
                 }
 
-                // Nudge Unity to process the queue
+                EditorApplication.update += OnUpdate;
+
+                // Nudge Unity to process the update queue
                 try { EditorApplication.QueuePlayerLoopUpdate(); } catch { }
 
                 return await tcs.Task;
