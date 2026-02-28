@@ -12,6 +12,8 @@ namespace NativeMcp.Editor
     internal static class NativeMcpReloadHandler
     {
         private const string ResumeAfterReloadKey = "NativeMcp_ResumeAfterReload";
+        private static bool _pendingResume;
+        private static int _resumeFrameDelay;
 
         static NativeMcpReloadHandler()
         {
@@ -47,24 +49,47 @@ namespace NativeMcp.Editor
                 {
                     EditorPrefs.DeleteKey(ResumeAfterReloadKey);
 
-                    // Delay slightly to avoid conflicts during reload
-                    EditorApplication.delayCall += () =>
-                    {
-                        try
-                        {
-                            Debug.Log("[NativeMcp] Resuming server after assembly reload...");
-                            NativeMcpServerHost.StartServer();
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.LogError($"[NativeMcp] Failed to resume after reload: {ex.Message}");
-                        }
-                    };
+                    // Use EditorApplication.update with a frame delay — more reliable than delayCall
+                    _pendingResume = true;
+                    _resumeFrameDelay = 3; // wait 3 editor frames
+                    EditorApplication.update += OnResumeUpdate;
                 }
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[NativeMcp] Error during post-reload resume: {ex.Message}");
+            }
+        }
+
+        private static void OnResumeUpdate()
+        {
+            if (!_pendingResume)
+            {
+                EditorApplication.update -= OnResumeUpdate;
+                return;
+            }
+
+            // Wait a few frames for Unity to fully settle
+            if (_resumeFrameDelay > 0)
+            {
+                _resumeFrameDelay--;
+                return;
+            }
+
+            _pendingResume = false;
+            EditorApplication.update -= OnResumeUpdate;
+
+            try
+            {
+                if (!NativeMcpServerHost.IsRunning)
+                {
+                    Debug.Log("[NativeMcp] Resuming server after assembly reload...");
+                    NativeMcpServerHost.StartServer();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[NativeMcp] Failed to resume after reload: {ex.Message}");
             }
         }
     }
