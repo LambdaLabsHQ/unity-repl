@@ -385,43 +385,17 @@ namespace NativeMcp.Editor.Tools
             {
                 int size = (superSize.HasValue && superSize.Value > 0) ? superSize.Value : 1;
 
-                // Always use Camera + RenderTexture for synchronous capture (works in both Play and Edit mode)
-                Camera cam = Camera.main;
-                if (cam == null)
+                // Capture using ScreenCapture API instead of RenderTexture
+                var tex = ScreenCapture.CaptureScreenshotAsTexture(size);
+                if (tex == null)
                 {
-                    var cams = UnityEngine.Object.FindObjectsOfType<Camera>();
-                    cam = cams.FirstOrDefault();
-                }
-                if (cam == null)
-                {
-                    return new ErrorResponse("No camera found to capture screenshot.");
+                    return new ErrorResponse("ScreenCapture.CaptureScreenshotAsTexture returned null.");
                 }
 
-                // Capture synchronously via RenderTexture
-                int width = Mathf.Max(1, cam.pixelWidth > 0 ? cam.pixelWidth : Screen.width) * size;
-                int height = Mathf.Max(1, cam.pixelHeight > 0 ? cam.pixelHeight : Screen.height) * size;
-
-                RenderTexture prevRT = cam.targetTexture;
-                RenderTexture prevActive = RenderTexture.active;
-                var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
-                byte[] pngBytes;
-                try
-                {
-                    cam.targetTexture = rt;
-                    cam.Render();
-                    RenderTexture.active = rt;
-                    var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
-                    tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-                    tex.Apply();
-                    pngBytes = tex.EncodeToPNG();
-                    UnityEngine.Object.DestroyImmediate(tex);
-                }
-                finally
-                {
-                    cam.targetTexture = prevRT;
-                    RenderTexture.active = prevActive;
-                    RenderTexture.ReleaseTemporary(rt);
-                }
+                byte[] pngBytes = tex.EncodeToPNG();
+                int width = tex.width;
+                int height = tex.height;
+                UnityEngine.Object.DestroyImmediate(tex);
 
                 // Save to file for reference
                 string resolvedName = string.IsNullOrWhiteSpace(fileName)
