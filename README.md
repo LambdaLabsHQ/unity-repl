@@ -2,7 +2,7 @@
 
 A pure C# MCP (Model Context Protocol) Streamable HTTP server running **inside Unity Editor**.
 
-Replaces the Python/uvx middle layer by implementing the MCP Streamable HTTP protocol directly using `System.Net.HttpListener`, bridging to existing `[McpForUnityTool]` handlers from `com.coplaydev.unity-mcp`.
+Implements the MCP Streamable HTTP protocol directly using `System.Net.HttpListener`, with built-in Unity tool handlers for scene, asset, script, material, prefab, VFX management and more.
 
 ## Architecture
 
@@ -28,5 +28,4 @@ AI Client  ──(HTTP Streamable/SSE)──►  Unity Editor (HttpListener :809
 
 ## Dependencies
 
-- `com.coplaydev.unity-mcp` (for tool registry and dispatch)
 - `com.unity.nuget.newtonsoft-json`
