@@ -38,7 +38,7 @@ namespace MCPForUnity.Editor.Tools
                 // ignore parse failures
             }
 
-            if (TestRunStatus.IsRunning)
+            if (false) // Test runner removed
             {
                 return new ErrorResponse("tests_running", new
                 {
@@ -161,7 +161,7 @@ namespace MCPForUnity.Editor.Tools
 
                     if (!EditorApplication.isCompiling
                         && !EditorApplication.isUpdating
-                        && !TestRunStatus.IsRunning
+                        // TestRunStatus removed
                         && !EditorApplication.isPlayingOrWillChangePlaymode)
                     {
                         EditorApplication.update -= Tick;

@@ -294,7 +294,7 @@ namespace MCPForUnity.Editor.Services
             bool isPlaying = EditorApplication.isPlaying;
             bool isPaused = EditorApplication.isPaused;
             bool isUpdating = EditorApplication.isUpdating;
-            bool testsRunning = TestRunStatus.IsRunning;
+            bool testsRunning = false;
 
             var activityPhase = "idle";
             if (testsRunning)
@@ -377,9 +377,9 @@ namespace MCPForUnity.Editor.Services
             string scenePath = string.IsNullOrEmpty(scene.path) ? null : scene.path;
             string sceneGuid = !string.IsNullOrEmpty(scenePath) ? AssetDatabase.AssetPathToGUID(scenePath) : null;
 
-            bool testsRunning = TestRunStatus.IsRunning;
-            var testsMode = TestRunStatus.Mode?.ToString();
-            string currentJobId = TestJobManager.CurrentJobId;
+            bool testsRunning = false;
+            var testsMode = (string)null;
+            string currentJobId = (string)null;
             bool isFocused = InternalEditorUtility.isApplicationActive;
 
             var activityPhase = "idle";
@@ -467,12 +467,12 @@ namespace MCPForUnity.Editor.Services
                     IsRunning = testsRunning,
                     Mode = testsMode,
                     CurrentJobId = string.IsNullOrEmpty(currentJobId) ? null : currentJobId,
-                    StartedUnixMs = TestRunStatus.StartedUnixMs,
+                    StartedUnixMs = null,
                     StartedBy = "unknown",
-                    LastRun = TestRunStatus.FinishedUnixMs.HasValue
+                    LastRun = (long?)null != null
                         ? new EditorStateLastRun
                         {
-                            FinishedUnixMs = TestRunStatus.FinishedUnixMs,
+                            FinishedUnixMs = null,
                             Result = "unknown",
                             Counts = null
                         }
