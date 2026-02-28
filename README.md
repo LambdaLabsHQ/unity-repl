@@ -26,6 +26,25 @@ AI Client  ──(HTTP Streamable/SSE)──►  Unity Editor (HttpListener :809
 }
 ```
 
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_scene_tree` | Returns full in-memory scene hierarchy as a compact recursive tree. Supports filters (maxDepth, componentFilter, nameFilter, includeInactive). |
+| `manage_scene` | Scene management: load, save, create, get_hierarchy (paged), screenshot. |
+| `find_gameobjects` | Search GameObjects by name/tag/component with pagination. |
+| `manage_gameobject` | Create, modify, delete GameObjects. |
+| `manage_components` | Add, remove, configure components on GameObjects. |
+| `invoke_dynamic` | Reflection-based method invocation and dynamic tool registry. |
+| `manage_asset` | Asset import, move, delete, search operations. |
+| `manage_script` | Script creation and editing. |
+| `manage_material` | Material and shader property management. |
+| `manage_editor` | Editor state control (play/stop/pause). |
+| `refresh_unity` | Trigger asset database refresh and recompilation. |
+| `read_console` | Read Unity console logs. |
+| `simulate_input` | Simulate keyboard/mouse input in Play Mode. |
+| `batch_execute` | Execute multiple tool calls in a single request. |
+
 ## Dependencies
 
 - `com.unity.nuget.newtonsoft-json`
