@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Tools.Vfx
+namespace NativeMcp.Editor.Tools.Vfx
 {
     internal static class TrailControl
     {

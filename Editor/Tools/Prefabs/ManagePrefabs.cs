@@ -1,13 +1,13 @@
 using System;
 using System.IO;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MCPForUnity.Editor.Tools.Prefabs
+namespace NativeMcp.Editor.Tools.Prefabs
 {
     [McpForUnityTool("manage_prefabs", AutoRegister = false)]
     /// <summary>

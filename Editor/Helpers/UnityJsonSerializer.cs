@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
-using MCPForUnity.Runtime.Serialization;
+using NativeMcp.Runtime.Serialization;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     /// <summary>
     /// Shared JsonSerializer with Unity type converters.

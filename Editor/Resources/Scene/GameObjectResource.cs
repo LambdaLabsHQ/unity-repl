@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Resources.Scene
+namespace NativeMcp.Editor.Resources.Scene
 {
     /// <summary>
     /// Resource handler for reading GameObject data.

@@ -1,11 +1,11 @@
 using System;
 using System.IO;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Resources.Project
+namespace NativeMcp.Editor.Resources.Project
 {
     /// <summary>
     /// Provides static project configuration information.

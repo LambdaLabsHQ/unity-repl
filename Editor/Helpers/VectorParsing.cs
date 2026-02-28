@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     /// <summary>
     /// Utility class for parsing JSON tokens into Unity vector, math, and animation types.
@@ -408,7 +408,7 @@ namespace MCPForUnity.Editor.Helpers
         /// </list>
         /// 
         /// <para><b>Note:</b> This method is used by ManageVFX. For ScriptableObject patching,
-        /// see <see cref="MCPForUnity.Editor.Tools.ManageScriptableObject"/> which has slightly different defaults.</para>
+        /// see <see cref="NativeMcp.Editor.Tools.ManageScriptableObject"/> which has slightly different defaults.</para>
         /// </summary>
         /// <param name="token">The JSON token to parse</param>
         /// <returns>The parsed AnimationCurve or null if parsing fails</returns>

@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MCPForUnity.Editor.Services
+namespace NativeMcp.Editor.Services
 {
     /// <summary>
     /// Metadata for a discovered tool

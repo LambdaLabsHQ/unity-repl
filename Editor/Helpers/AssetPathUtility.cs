@@ -1,12 +1,12 @@
 using System;
 using System.IO;
-using MCPForUnity.Editor.Constants;
+using NativeMcp.Editor.Constants;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     /// <summary>
     /// Provides common utility methods for working with Unity asset paths.
@@ -59,7 +59,7 @@ namespace MCPForUnity.Editor.Helpers
                     return packageInfo.assetPath;
                 }
 
-                // Fallback to AssetDatabase for Asset Store installs (Assets/MCPForUnity)
+                // Fallback to AssetDatabase for Asset Store installs
                 string[] guids = AssetDatabase.FindAssets($"t:Script {nameof(AssetPathUtility)}");
 
                 if (guids.Length == 0)

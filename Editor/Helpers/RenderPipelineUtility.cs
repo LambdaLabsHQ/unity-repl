@@ -2,7 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     internal static class RenderPipelineUtility
     {

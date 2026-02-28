@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 
-namespace MCPForUnity.Editor.Resources.Editor
+namespace NativeMcp.Editor.Resources.Editor
 {
     /// <summary>
     /// Provides detailed information about the current editor selection.

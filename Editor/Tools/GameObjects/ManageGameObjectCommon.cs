@@ -2,14 +2,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using MCPForUnity.Editor.Helpers;
-using MCPForUnity.Editor.Tools;
+using NativeMcp.Editor.Helpers;
+using NativeMcp.Editor.Tools;
 using Newtonsoft.Json.Linq;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MCPForUnity.Editor.Tools.GameObjects
+namespace NativeMcp.Editor.Tools.GameObjects
 {
     internal static class ManageGameObjectCommon
     {

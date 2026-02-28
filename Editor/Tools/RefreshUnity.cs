@@ -1,13 +1,13 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using MCPForUnity.Editor.Helpers;
-using MCPForUnity.Editor.Services;
+using NativeMcp.Editor.Helpers;
+using NativeMcp.Editor.Services;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEditor.Compilation;
 
-namespace MCPForUnity.Editor.Tools
+namespace NativeMcp.Editor.Tools
 {
     /// <summary>
     /// Explicitly refreshes Unity's asset database and optionally requests a script compilation.

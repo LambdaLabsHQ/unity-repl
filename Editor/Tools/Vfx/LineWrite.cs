@@ -1,10 +1,10 @@
 using System.Collections.Generic;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Tools.Vfx
+namespace NativeMcp.Editor.Tools.Vfx
 {
     internal static class LineWrite
     {

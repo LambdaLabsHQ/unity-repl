@@ -1,6 +1,6 @@
 using Newtonsoft.Json.Linq;
 
-namespace MCPForUnity.Editor.Models
+namespace NativeMcp.Editor.Models
 {
     /// <summary>
     /// Represents a command received from the MCP client

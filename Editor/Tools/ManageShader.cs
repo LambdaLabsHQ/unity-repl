@@ -2,12 +2,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Tools
+namespace NativeMcp.Editor.Tools
 {
     /// <summary>
     /// Handles CRUD operations for shader files within the Unity project.

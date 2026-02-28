@@ -1,6 +1,6 @@
 using System;
 using System.Reflection;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
@@ -8,7 +8,7 @@ using UnityEditorInternal;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Services
+namespace NativeMcp.Editor.Services
 {
     /// <summary>
     /// Maintains a cached readiness snapshot (v2) so status reads remain fast even when Unity is busy.

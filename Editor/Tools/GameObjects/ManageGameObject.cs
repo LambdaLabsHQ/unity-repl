@@ -3,12 +3,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using MCPForUnity.Editor.Helpers; // For Response class
+using NativeMcp.Editor.Helpers; // For Response class
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-namespace MCPForUnity.Editor.Tools.GameObjects
+namespace NativeMcp.Editor.Tools.GameObjects
 {
     /// <summary>
     /// Handles GameObject manipulation within the current scene (CRUD, find, components).

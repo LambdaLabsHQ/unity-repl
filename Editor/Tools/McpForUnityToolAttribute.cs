@@ -1,6 +1,6 @@
 using System;
 
-namespace MCPForUnity.Editor.Tools
+namespace NativeMcp.Editor.Tools
 {
     /// <summary>
     /// Marks a class as an MCP tool handler
@@ -32,7 +32,7 @@ namespace MCPForUnity.Editor.Tools
 
         /// <summary>
         /// Enables the polling middleware for long-running tools. When true, Unity
-        /// should return a PendingResponse and the Python side will poll using
+        /// should return a PendingResponse and the server will poll using
         /// <see cref="PollAction"/> until completion.
         /// </summary>
         public bool RequiresPolling { get; set; } = false;

@@ -1,8 +1,8 @@
-using MCPForUnity.Editor.Constants;
+using NativeMcp.Editor.Constants;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     internal static class McpLog
     {

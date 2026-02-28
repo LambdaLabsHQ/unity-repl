@@ -4,12 +4,12 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using MCPForUnity.Editor.Helpers;
-using MCPForUnity.Editor.Resources;
+using NativeMcp.Editor.Helpers;
+using NativeMcp.Editor.Resources;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace MCPForUnity.Editor.Tools
+namespace NativeMcp.Editor.Tools
 {
     /// <summary>
     /// Holds information about a registered command handler.

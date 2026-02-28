@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace MCPForUnity.Editor.Helpers
+namespace NativeMcp.Editor.Helpers
 {
     public interface IMcpResponse
     {

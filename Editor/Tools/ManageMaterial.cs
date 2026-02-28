@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
-using MCPForUnity.Editor.Helpers;
+using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Tools
+namespace NativeMcp.Editor.Tools
 {
     [McpForUnityTool("manage_material", AutoRegister = false)]
     public static class ManageMaterial
@@ -513,7 +513,7 @@ namespace MCPForUnity.Editor.Tools
             {
                 material = new Material(shader);
 
-                // Apply color param during creation (keeps Python tool signature and C# implementation consistent).
+                // Apply color param during creation (keeps tool signature consistent).
                 // If "properties" already contains a color property, let properties win.
                 bool shouldApplyColor = false;
                 if (colorToken != null)

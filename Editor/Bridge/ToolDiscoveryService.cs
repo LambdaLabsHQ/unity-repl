@@ -2,12 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using MCPForUnity.Editor.Constants;
-using MCPForUnity.Editor.Helpers;
-using MCPForUnity.Editor.Tools;
+using NativeMcp.Editor.Constants;
+using NativeMcp.Editor.Helpers;
+using NativeMcp.Editor.Tools;
 using UnityEditor;
 
-namespace MCPForUnity.Editor.Services
+namespace NativeMcp.Editor.Services
 {
     public class ToolDiscoveryService : IToolDiscoveryService
     {
@@ -259,12 +259,12 @@ namespace MCPForUnity.Editor.Services
                 return false;
             }
 
-            if (type != null && !string.IsNullOrEmpty(type.Namespace) && type.Namespace.StartsWith("MCPForUnity.Editor.Tools", StringComparison.Ordinal))
+            if (type != null && !string.IsNullOrEmpty(type.Namespace) && type.Namespace.StartsWith("NativeMcp.Editor.Tools", StringComparison.Ordinal))
             {
                 return true;
             }
 
-            if (!string.IsNullOrEmpty(metadata.AssemblyName) && metadata.AssemblyName.Equals("MCPForUnity.Editor", StringComparison.Ordinal))
+            if (!string.IsNullOrEmpty(metadata.AssemblyName) && metadata.AssemblyName.Equals("NativeMcp.Editor", StringComparison.Ordinal))
             {
                 return true;
             }

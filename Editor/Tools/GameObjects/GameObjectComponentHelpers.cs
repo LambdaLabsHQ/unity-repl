@@ -3,15 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using MCPForUnity.Editor.Helpers;
-using MCPForUnity.Editor.Tools;
-using MCPForUnity.Runtime.Serialization;
+using NativeMcp.Editor.Helpers;
+using NativeMcp.Editor.Tools;
+using NativeMcp.Runtime.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace MCPForUnity.Editor.Tools.GameObjects
+namespace NativeMcp.Editor.Tools.GameObjects
 {
     internal static class GameObjectComponentHelpers
     {

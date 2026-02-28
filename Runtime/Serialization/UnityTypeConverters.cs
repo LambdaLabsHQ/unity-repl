@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEditor; // Required for AssetDatabase and EditorUtility
 #endif
 
-namespace MCPForUnity.Runtime.Serialization
+namespace NativeMcp.Runtime.Serialization
 {
     public class Vector3Converter : JsonConverter<Vector3>
     {

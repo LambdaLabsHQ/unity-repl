@@ -1,6 +1,6 @@
 using System;
 
-namespace MCPForUnity.Editor.Resources
+namespace NativeMcp.Editor.Resources
 {
     /// <summary>
     /// Marks a class as an MCP resource handler for auto-discovery.
