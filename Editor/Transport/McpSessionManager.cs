@@ -51,6 +51,20 @@ namespace NativeMcp.Editor.Transport
         }
 
         /// <summary>
+        /// Adopt an unknown session ID (e.g., from a client that was connected before a server restart).
+        /// This registers the given ID as a valid session so the client can continue without re-initializing.
+        /// </summary>
+        public void AdoptSession(string sessionId)
+        {
+            if (string.IsNullOrEmpty(sessionId)) return;
+            _sessions[sessionId] = new SessionInfo
+            {
+                CreatedAt = DateTime.UtcNow,
+                LastAccessedAt = DateTime.UtcNow
+            };
+        }
+
+        /// <summary>
         /// Terminate a session by ID.
         /// </summary>
         public bool TerminateSession(string sessionId)

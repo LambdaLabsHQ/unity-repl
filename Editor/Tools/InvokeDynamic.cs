@@ -584,6 +584,12 @@ namespace NativeMcp.Editor.Tools
             try
             {
                 object result = method.Invoke(target, invokeArgs);
+
+                // If the method returns a McpToolCallResult (e.g., screenshot with image block),
+                // pass it through directly so the MCP transport can return the image content block.
+                if (result is NativeMcp.Editor.Protocol.McpToolCallResult)
+                    return result;
+
                 string info = method.ReturnType == typeof(void) ? "void" : method.ReturnType.Name;
                 return new SuccessResponse(
                     $"{targetType.Name}.{method.Name}() → {info}",

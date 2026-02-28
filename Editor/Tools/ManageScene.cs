@@ -383,45 +383,83 @@ namespace NativeMcp.Editor.Tools
         {
             try
             {
-                int resolvedSuperSize = (superSize.HasValue && superSize.Value > 0) ? superSize.Value : 1;
-                ScreenshotCaptureResult result;
+                int size = (superSize.HasValue && superSize.Value > 0) ? superSize.Value : 1;
 
-                if (Application.isPlaying)
+                // Always use Camera + RenderTexture for synchronous capture (works in both Play and Edit mode)
+                Camera cam = Camera.main;
+                if (cam == null)
                 {
-                    result = ScreenshotUtility.CaptureToAssetsFolder(fileName, resolvedSuperSize, ensureUniqueFileName: true);
+                    var cams = UnityEngine.Object.FindObjectsOfType<Camera>();
+                    cam = cams.FirstOrDefault();
                 }
-                else
+                if (cam == null)
                 {
-                    // Edit Mode path: render from the best-guess camera using RenderTexture.
-                    Camera cam = Camera.main;
-                    if (cam == null)
-                    {
-                        // Use FindObjectsOfType for Unity 2021 compatibility
-                        var cams = UnityEngine.Object.FindObjectsOfType<Camera>();
-                        cam = cams.FirstOrDefault();
-                    }
-
-                    if (cam == null)
-                    {
-                        return new ErrorResponse("No camera found to capture screenshot in Edit Mode.");
-                    }
-
-                    result = ScreenshotUtility.CaptureFromCameraToAssetsFolder(cam, fileName, resolvedSuperSize, ensureUniqueFileName: true);
+                    return new ErrorResponse("No camera found to capture screenshot.");
                 }
 
-                AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                // Capture synchronously via RenderTexture
+                int width = Mathf.Max(1, cam.pixelWidth > 0 ? cam.pixelWidth : Screen.width) * size;
+                int height = Mathf.Max(1, cam.pixelHeight > 0 ? cam.pixelHeight : Screen.height) * size;
 
-                string message = $"Screenshot captured to '{result.AssetsRelativePath}' (full: {result.FullPath}).";
+                RenderTexture prevRT = cam.targetTexture;
+                RenderTexture prevActive = RenderTexture.active;
+                var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+                byte[] pngBytes;
+                try
+                {
+                    cam.targetTexture = rt;
+                    cam.Render();
+                    RenderTexture.active = rt;
+                    var tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+                    tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                    tex.Apply();
+                    pngBytes = tex.EncodeToPNG();
+                    UnityEngine.Object.DestroyImmediate(tex);
+                }
+                finally
+                {
+                    cam.targetTexture = prevRT;
+                    RenderTexture.active = prevActive;
+                    RenderTexture.ReleaseTemporary(rt);
+                }
 
-                return new SuccessResponse(
-                    message,
-                    new
+                // Save to file for reference
+                string resolvedName = string.IsNullOrWhiteSpace(fileName)
+                    ? $"screenshot-{DateTime.Now:yyyyMMdd-HHmmss}.png"
+                    : (fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? fileName : fileName + ".png");
+                string folder = Path.Combine(Application.dataPath, "Screenshots");
+                Directory.CreateDirectory(folder);
+                string fullPath = Path.Combine(folder, resolvedName).Replace('\\', '/');
+                // Ensure unique
+                if (File.Exists(fullPath))
+                {
+                    string dir = Path.GetDirectoryName(fullPath);
+                    string baseName = Path.GetFileNameWithoutExtension(fullPath);
+                    string ext = Path.GetExtension(fullPath);
+                    int counter = 1;
+                    do { fullPath = Path.Combine(dir, $"{baseName}-{counter}{ext}").Replace('\\', '/'); counter++; }
+                    while (File.Exists(fullPath));
+                }
+                File.WriteAllBytes(fullPath, pngBytes);
+
+                string projectRoot = Path.GetFullPath(Path.Combine(Application.dataPath, "..")).Replace('\\', '/');
+                if (!projectRoot.EndsWith("/")) projectRoot += "/";
+                string assetsRelPath = fullPath.StartsWith(projectRoot, StringComparison.OrdinalIgnoreCase)
+                    ? fullPath.Substring(projectRoot.Length)
+                    : fullPath;
+
+                string base64 = System.Convert.ToBase64String(pngBytes);
+                string message = $"Screenshot captured to '{assetsRelPath}' ({width}x{height}).";
+
+                return new NativeMcp.Editor.Protocol.McpToolCallResult
+                {
+                    IsError = false,
+                    Content = new List<NativeMcp.Editor.Protocol.McpContentBlock>
                     {
-                        path = result.AssetsRelativePath,
-                        fullPath = result.FullPath,
-                        superSize = result.SuperSize,
+                        new NativeMcp.Editor.Protocol.McpContentBlock { Type = "text", Text = message },
+                        new NativeMcp.Editor.Protocol.McpContentBlock { Type = "image", Data = base64, MimeType = "image/png" }
                     }
-                );
+                };
             }
             catch (Exception e)
             {

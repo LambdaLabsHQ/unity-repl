@@ -80,6 +80,14 @@ namespace NativeMcp.Editor.Protocol
 
         [JsonProperty("text", NullValueHandling = NullValueHandling.Ignore)]
         public string Text { get; set; }
+
+        /// <summary>Base64-encoded binary data (used when Type == "image").</summary>
+        [JsonProperty("data", NullValueHandling = NullValueHandling.Ignore)]
+        public string Data { get; set; }
+
+        /// <summary>MIME type of the binary data, e.g. "image/png" (used when Type == "image").</summary>
+        [JsonProperty("mimeType", NullValueHandling = NullValueHandling.Ignore)]
+        public string MimeType { get; set; }
     }
 
     /// <summary>

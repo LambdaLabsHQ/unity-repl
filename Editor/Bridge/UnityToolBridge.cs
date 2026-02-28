@@ -197,6 +197,10 @@ namespace NativeMcp.Editor.Bridge
 
         private static McpToolCallResult WrapResult(object rawResult)
         {
+            // If the handler already returned a fully-formed McpToolCallResult, pass it through.
+            if (rawResult is McpToolCallResult alreadyWrapped)
+                return alreadyWrapped;
+
             if (rawResult == null)
             {
                 return new McpToolCallResult

@@ -241,21 +241,9 @@ namespace NativeMcp.Editor.Transport
                 isInitialize = req?.Method == "initialize";
             }
 
-            // Session validation (skip for initialize)
-            if (!isInitialize)
-            {
-                string sessionId = request.Headers["Mcp-Session-Id"];
-                if (!string.IsNullOrEmpty(sessionId))
-                {
-                    if (!_sessionManager.ValidateSession(sessionId))
-                    {
-                        response.StatusCode = 404;
-                        response.Close();
-                        return;
-                    }
-                }
-                // We don't require session ID for simplicity; clients that don't send it are OK
-            }
+            // Session validation disabled — this is a localhost-only dev tool,
+            // and rejecting stale session IDs breaks clients (like Antigravity)
+            // that cache the ID across server restarts.
 
             // Process the request(s)
             string responseJson;
