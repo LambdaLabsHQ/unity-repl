@@ -517,6 +517,14 @@ namespace NativeMcp.Editor.Tools
                     Convert.ToSingle(v2.GetValueOrDefault("y", 0f)));
             }
 
+            // Unwrap Nullable<T> → T so Convert.ChangeType works (it cannot convert to Nullable directly)
+            Type underlying = Nullable.GetUnderlyingType(target);
+            if (underlying != null)
+            {
+                if (value == null) return null;
+                return Convert.ChangeType(value, underlying);
+            }
+
             return Convert.ChangeType(value, target);
         }
 
