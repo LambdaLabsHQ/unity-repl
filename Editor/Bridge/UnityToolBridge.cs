@@ -98,6 +98,8 @@ namespace NativeMcp.Editor.Bridge
         /// Marshal a function that returns Task&lt;object&gt; to the Unity main thread
         /// using EditorApplication.update, which is the proven approach for
         /// background→main thread marshaling in Unity Editor.
+        /// EditorNudge continuously wakes Unity's message pump (~30 Hz) so this
+        /// works even when the editor window is not focused.
         /// </summary>
         private static async Task<object> RunOnMainThreadAsync(
             Func<Task<object>> func, CancellationToken ct)
@@ -110,12 +112,17 @@ namespace NativeMcp.Editor.Bridge
 
             var tcs = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            using (ct.Register(() => tcs.TrySetCanceled(ct)))
+            using (ct.Register(() =>
+            {
+                if (tcs.TrySetCanceled(ct))
+                    EditorNudge.EndNudge();
+            }))
             {
                 // Schedule execution on Unity main thread via EditorApplication.update
                 void OnUpdate()
                 {
                     EditorApplication.update -= OnUpdate;
+                    EditorNudge.EndNudge();
 
                     try
                     {
@@ -139,8 +146,8 @@ namespace NativeMcp.Editor.Bridge
 
                 EditorApplication.update += OnUpdate;
 
-                // Nudge Unity to process the update queue
-                try { EditorApplication.QueuePlayerLoopUpdate(); } catch { }
+                // Start continuous nudging — wakes Unity even when backgrounded
+                EditorNudge.BeginNudge();
 
                 return await tcs.Task;
             }

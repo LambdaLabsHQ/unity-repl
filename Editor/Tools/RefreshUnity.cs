@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using NativeMcp.Editor.Bridge;
 using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Services;
 using Newtonsoft.Json.Linq;
@@ -149,12 +150,14 @@ namespace NativeMcp.Editor.Tools
                     if (tcs.Task.IsCompleted)
                     {
                         EditorApplication.update -= Tick;
+                        EditorNudge.EndNudge();
                         return;
                     }
 
                     if ((DateTime.UtcNow - start) > timeout)
                     {
                         EditorApplication.update -= Tick;
+                        EditorNudge.EndNudge();
                         tcs.TrySetException(new TimeoutException());
                         return;
                     }
@@ -165,19 +168,21 @@ namespace NativeMcp.Editor.Tools
                         && !EditorApplication.isPlayingOrWillChangePlaymode)
                     {
                         EditorApplication.update -= Tick;
+                        EditorNudge.EndNudge();
                         tcs.TrySetResult(true);
                     }
                 }
                 catch (Exception ex)
                 {
                     EditorApplication.update -= Tick;
+                    EditorNudge.EndNudge();
                     tcs.TrySetException(ex);
                 }
             }
 
             EditorApplication.update += Tick;
-            // Nudge Unity to pump once in case update is throttled.
-            try { EditorApplication.QueuePlayerLoopUpdate(); } catch { }
+            // Start continuous nudging — wakes Unity even when backgrounded
+            EditorNudge.BeginNudge();
             return tcs.Task;
         }
     }
