@@ -385,16 +385,72 @@ namespace NativeMcp.Editor.Tools
             {
                 int size = (superSize.HasValue && superSize.Value > 0) ? superSize.Value : 1;
 
-                // Capture using ScreenCapture API instead of RenderTexture
-                var tex = ScreenCapture.CaptureScreenshotAsTexture(size);
-                if (tex == null)
+                Texture2D tex;
+
+                if (Application.isPlaying)
                 {
-                    return new ErrorResponse("ScreenCapture.CaptureScreenshotAsTexture returned null.");
+                    // Play Mode: ScreenCapture captures the final composited frame including
+                    // Screen Space – Overlay canvases, which cam.Render() misses entirely.
+                    tex = ScreenCapture.CaptureScreenshotAsTexture(size);
+                    if (tex == null)
+                        return new ErrorResponse("ScreenCapture.CaptureScreenshotAsTexture returned null.");
+                }
+                else
+                {
+                    // Edit Mode: ScreenCapture is not available; fall back to rendering the
+                    // active base camera into a RenderTexture.
+                    Camera cam = Camera.main;
+
+                    // Prepare URP reflection to safely detect and exclude Overlay cameras.
+                    var urpCamDataType = System.Type.GetType("UnityEngine.Rendering.Universal.UniversalAdditionalCameraData, Unity.RenderPipelines.Universal.Runtime");
+                    var renderTypeProp = urpCamDataType?.GetProperty("renderType");
+
+                    if (cam == null || !cam.isActiveAndEnabled)
+                    {
+                        foreach (var c in UnityEngine.Object.FindObjectsByType<Camera>(FindObjectsSortMode.None))
+                        {
+                            if (!c.isActiveAndEnabled || c.targetTexture != null) continue;
+
+                            if (urpCamDataType != null && renderTypeProp != null)
+                            {
+                                var uacd = c.GetComponent(urpCamDataType);
+                                if (uacd != null && renderTypeProp.GetValue(uacd)?.ToString() == "Overlay") continue;
+                            }
+
+                            if (cam == null || c.depth > cam.depth) cam = c;
+                        }
+                    }
+
+                    if (cam == null)
+                        return new ErrorResponse("No valid screen-rendering Camera found to capture screenshot.");
+
+                    int width = Mathf.Max(1, cam.pixelWidth > 0 ? cam.pixelWidth : Screen.width) * size;
+                    int height = Mathf.Max(1, cam.pixelHeight > 0 ? cam.pixelHeight : Screen.height) * size;
+
+                    var rt = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
+                    tex = new Texture2D(width, height, TextureFormat.RGBA32, false);
+
+                    var prevRT = cam.targetTexture;
+                    var prevActive = RenderTexture.active;
+                    try
+                    {
+                        cam.targetTexture = rt;
+                        cam.Render();
+                        RenderTexture.active = rt;
+                        tex.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                        tex.Apply();
+                    }
+                    finally
+                    {
+                        cam.targetTexture = prevRT;
+                        RenderTexture.active = prevActive;
+                        RenderTexture.ReleaseTemporary(rt);
+                    }
                 }
 
+                int texWidth = tex.width;
+                int texHeight = tex.height;
                 byte[] pngBytes = tex.EncodeToPNG();
-                int width = tex.width;
-                int height = tex.height;
                 UnityEngine.Object.DestroyImmediate(tex);
 
                 // Save to file for reference
@@ -423,7 +479,7 @@ namespace NativeMcp.Editor.Tools
                     : fullPath;
 
                 string base64 = System.Convert.ToBase64String(pngBytes);
-                string message = $"Screenshot captured to '{assetsRelPath}' ({width}x{height}).";
+                string message = $"Screenshot captured to '{assetsRelPath}' ({texWidth}x{texHeight}).";  // tex already destroyed above
 
                 return new NativeMcp.Editor.Protocol.McpToolCallResult
                 {
