@@ -81,47 +81,81 @@ namespace NativeMcp.Editor.Tools
                 bool includeTransform = ParamCoercion.CoerceBool(
                     @params?["includeTransform"] ?? @params?["include_transform"], false);
 
-                // ── Resolve target scene ──────────────────────────────────
-                Scene scene;
+                // ── Resolve target scene(s) ──────────────────────────────
                 var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
+                var scenesToQuery = new List<(Scene scene, string label)>();
+                string primarySceneName;
+
                 if (prefabStage != null)
                 {
-                    scene = prefabStage.scene;
+                    scenesToQuery.Add((prefabStage.scene, "PrefabStage"));
+                    primarySceneName = prefabStage.scene.name;
                 }
                 else if (sceneIndex >= 0 && sceneIndex < SceneManager.sceneCount)
                 {
-                    scene = SceneManager.GetSceneAt(sceneIndex);
+                    // Specific scene requested
+                    var scene = SceneManager.GetSceneAt(sceneIndex);
+                    scenesToQuery.Add((scene, scene.name));
+                    primarySceneName = scene.name;
                 }
                 else
                 {
-                    scene = EditorSceneManager.GetActiveScene();
+                    // Default: query ALL loaded scenes (fixes Play Mode 0-node issue)
+                    for (int i = 0; i < SceneManager.sceneCount; i++)
+                    {
+                        var scene = SceneManager.GetSceneAt(i);
+                        if (scene.IsValid() && scene.isLoaded)
+                        {
+                            scenesToQuery.Add((scene, scene.name));
+                        }
+                    }
+                    var activeScene = EditorSceneManager.GetActiveScene();
+                    primarySceneName = activeScene.IsValid() ? activeScene.name : "Unknown";
                 }
 
-                if (!scene.IsValid() || !scene.isLoaded)
-                {
-                    return new ErrorResponse("No valid loaded scene found.");
-                }
-
-                // ── Build tree ────────────────────────────────────────────
-                var roots = scene.GetRootGameObjects();
+                // ── Build tree from all target scenes ────────────────────
                 var tree = new List<object>();
                 int nodeCount = 0;
                 const int hardNodeLimit = 10000; // safety cap
 
-                foreach (var root in roots)
+                foreach (var (scene, label) in scenesToQuery)
                 {
-                    if (root == null) continue;
-                    var node = BuildNode(root, 0, maxDepth, includeInactive,
-                        componentFilter, nameFilter, includePath, includeTransform,
-                        ref nodeCount, hardNodeLimit);
-                    if (node != null) tree.Add(node);
+                    if (!scene.IsValid() || !scene.isLoaded) continue;
+                    var roots = scene.GetRootGameObjects();
+                    foreach (var root in roots)
+                    {
+                        if (root == null) continue;
+                        if (nodeCount >= hardNodeLimit) break;
+                        var node = BuildNode(root, 0, maxDepth, includeInactive,
+                            componentFilter, nameFilter, includePath, includeTransform,
+                            ref nodeCount, hardNodeLimit);
+                        if (node != null) tree.Add(node);
+                    }
                 }
 
-                return new SuccessResponse(
-                    $"Scene tree for '{scene.name}' ({nodeCount} nodes)", new
+                // ── In Play Mode, also include DontDestroyOnLoad scene ───
+                if (Application.isPlaying && sceneIndex < 0 && nodeCount < hardNodeLimit)
+                {
+                    var ddolRoots = GetDontDestroyOnLoadRoots();
+                    if (ddolRoots != null)
                     {
-                        scene = scene.name,
-                        scenePath = scene.path,
+                        foreach (var root in ddolRoots)
+                        {
+                            if (root == null || nodeCount >= hardNodeLimit) continue;
+                            var node = BuildNode(root, 0, maxDepth, includeInactive,
+                                componentFilter, nameFilter, includePath, includeTransform,
+                                ref nodeCount, hardNodeLimit);
+                            if (node != null) tree.Add(node);
+                        }
+                    }
+                }
+
+                var activeSceneForResponse = EditorSceneManager.GetActiveScene();
+                return new SuccessResponse(
+                    $"Scene tree for '{primarySceneName}' ({nodeCount} nodes)", new
+                    {
+                        scene = primarySceneName,
+                        scenePath = activeSceneForResponse.IsValid() ? activeSceneForResponse.path : "",
                         nodeCount,
                         truncated = nodeCount >= hardNodeLimit,
                         tree
@@ -131,6 +165,38 @@ namespace NativeMcp.Editor.Tools
             {
                 McpLog.Error($"[GetSceneTree] {ex.Message}");
                 return new ErrorResponse($"Error building scene tree: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Gets root GameObjects from the DontDestroyOnLoad scene.
+        /// Uses a temporary probe object to discover the hidden scene.
+        /// </summary>
+        private static GameObject[] GetDontDestroyOnLoadRoots()
+        {
+            GameObject temp = null;
+            try
+            {
+                temp = new GameObject("__MCP_DDOL_Probe__");
+                temp.hideFlags = HideFlags.HideAndDontSave;
+                UnityEngine.Object.DontDestroyOnLoad(temp);
+                var ddolScene = temp.scene;
+                if (!ddolScene.IsValid()) return null;
+
+                var roots = ddolScene.GetRootGameObjects();
+                // Filter out the temp probe (it will be destroyed, but get roots first)
+                var filtered = new List<GameObject>();
+                foreach (var root in roots)
+                {
+                    if (root != null && root.name != "__MCP_DDOL_Probe__")
+                        filtered.Add(root);
+                }
+                return filtered.ToArray();
+            }
+            finally
+            {
+                if (temp != null)
+                    UnityEngine.Object.DestroyImmediate(temp);
             }
         }
 

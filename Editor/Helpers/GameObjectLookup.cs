@@ -272,7 +272,9 @@ namespace NativeMcp.Editor.Helpers
         }
 
         /// <summary>
-        /// Gets all GameObjects in the current scene.
+        /// Gets all GameObjects across all loaded scenes, including DontDestroyOnLoad.
+        /// In Play Mode, searches all loaded scenes (not just active) to handle
+        /// scene transitions and domain reload timing issues.
         /// </summary>
         public static IEnumerable<GameObject> GetAllSceneObjects(bool includeInactive)
         {
@@ -288,14 +290,70 @@ namespace NativeMcp.Editor.Helpers
                 yield break;
             }
 
-            // Normal scene mode
-            var scene = SceneManager.GetActiveScene();
-            if (!scene.IsValid())
+            // Search ALL loaded scenes (not just active scene)
+            // This is critical for Play Mode where objects may be in different scenes
+            // due to scene transitions, additive loading, or domain reload timing
+            var visitedIds = new HashSet<int>();
+            for (int i = 0; i < SceneManager.sceneCount; i++)
+            {
+                var scene = SceneManager.GetSceneAt(i);
+                if (!scene.IsValid() || !scene.isLoaded) continue;
+
+                var rootObjects = scene.GetRootGameObjects();
+                foreach (var root in rootObjects)
+                {
+                    if (root == null) continue;
+                    foreach (var go in GetObjectAndDescendants(root, includeInactive))
+                    {
+                        if (visitedIds.Add(go.GetInstanceID()))
+                            yield return go;
+                    }
+                }
+            }
+
+            // In Play Mode, also search DontDestroyOnLoad scene
+            // DontDestroyOnLoad objects are in a hidden scene not enumerated by SceneManager
+            if (Application.isPlaying)
+            {
+                foreach (var go in GetDontDestroyOnLoadObjects(includeInactive))
+                {
+                    if (visitedIds.Add(go.GetInstanceID()))
+                        yield return go;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Gets all GameObjects in the DontDestroyOnLoad scene.
+        /// Uses a temporary helper object to discover the hidden scene.
+        /// </summary>
+        private static IEnumerable<GameObject> GetDontDestroyOnLoadObjects(bool includeInactive)
+        {
+            // Create a temporary object, move to DontDestroyOnLoad, get its scene, then destroy it
+            GameObject temp = null;
+            Scene ddolScene = default;
+            try
+            {
+                temp = new GameObject("__MCP_DDOL_Probe__");
+                temp.hideFlags = HideFlags.HideAndDontSave;
+                UnityEngine.Object.DontDestroyOnLoad(temp);
+                ddolScene = temp.scene;
+            }
+            finally
+            {
+                if (temp != null)
+                    UnityEngine.Object.DestroyImmediate(temp);
+            }
+
+            if (!ddolScene.IsValid())
                 yield break;
 
-            var rootObjects = scene.GetRootGameObjects();
+            var rootObjects = ddolScene.GetRootGameObjects();
             foreach (var root in rootObjects)
             {
+                if (root == null) continue;
+                // Skip the temp object (already destroyed, but defensive)
+                if (root.name == "__MCP_DDOL_Probe__") continue;
                 foreach (var go in GetObjectAndDescendants(root, includeInactive))
                 {
                     yield return go;
