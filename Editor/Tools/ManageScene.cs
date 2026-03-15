@@ -262,13 +262,11 @@ namespace NativeMcp.Editor.Tools
                 return new ErrorResponse(
                     "Current scene has unsaved changes. Please save or discard changes before loading a new scene."
                 );
-                // Example: bool saveOK = EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
-                // if (!saveOK) return new ErrorResponse("Load cancelled by user.");
             }
 
             try
             {
-                EditorSceneManager.OpenScene(relativePath, OpenSceneMode.Single);
+                ForceOpenScene(relativePath);
                 return new SuccessResponse(
                     $"Scene '{relativePath}' loaded successfully.",
                     new
@@ -304,7 +302,7 @@ namespace NativeMcp.Editor.Tools
             try
             {
                 string scenePath = SceneUtility.GetScenePathByBuildIndex(buildIndex);
-                EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+                ForceOpenScene(scenePath);
                 return new SuccessResponse(
                     $"Scene at build index {buildIndex} ('{scenePath}') loaded successfully.",
                     new
@@ -321,6 +319,28 @@ namespace NativeMcp.Editor.Tools
                     $"Error loading scene with build index {buildIndex}: {e.Message}"
                 );
             }
+        }
+
+        /// <summary>
+        /// Force-opens a scene from disk.
+        /// When the target scene is already the active scene (e.g. after domain reload from
+        /// recompilation), EditorSceneManager.OpenScene may skip re-reading from disk, leaving
+        /// rootCount=0 and all scene-placed GameObjects missing. This method detects that
+        /// situation and forces a full reload by first creating a temporary empty scene.
+        /// </summary>
+        private static void ForceOpenScene(string scenePath)
+        {
+            Scene active = EditorSceneManager.GetActiveScene();
+            bool sameScene = active.IsValid() && active.path == scenePath;
+
+            if (sameScene)
+            {
+                // Force Unity to release the current scene by switching to a blank scene first,
+                // then re-opening the target scene from disk.
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            }
+
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
         }
 
         private static object SaveScene(string fullPath, string relativePath)
