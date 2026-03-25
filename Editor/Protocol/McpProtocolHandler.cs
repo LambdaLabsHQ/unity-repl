@@ -62,6 +62,16 @@ namespace NativeMcp.Editor.Protocol
                     case "tools/call":
                         result = await HandleToolsCallAsync(request.Params, ct);
                         break;
+                    // Codex rmcp client probes these on connect — return empty lists
+                    case "resources/list":
+                        result = JToken.FromObject(new { resources = new object[0] });
+                        break;
+                    case "resources/templates/list":
+                        result = JToken.FromObject(new { resourceTemplates = new object[0] });
+                        break;
+                    case "prompts/list":
+                        result = JToken.FromObject(new { prompts = new object[0] });
+                        break;
                     default:
                         return SerializeError(request.Id, JsonRpcErrorCodes.MethodNotFound,
                             $"Method not found: {request.Method}");
