@@ -3,7 +3,9 @@
     "rootNamespace": "NativeMcp.Editor",
     "references": [
         "NativeMcp.Runtime",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
     ],
     "includePlatforms": [
         "Editor"
