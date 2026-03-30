@@ -182,7 +182,7 @@ namespace NativeMcp.Editor.Protocol
             return JToken.FromObject(result);
         }
 
-        private static string SerializeSuccess(JToken id, JToken result)
+        internal static string SerializeSuccess(JToken id, JToken result)
         {
             var response = new JsonRpcResponse
             {
@@ -192,7 +192,7 @@ namespace NativeMcp.Editor.Protocol
             return JsonConvert.SerializeObject(response, Formatting.None);
         }
 
-        private static string SerializeError(JToken id, int code, string message, JToken data = null)
+        internal static string SerializeError(JToken id, int code, string message, JToken data = null)
         {
             var response = new JsonRpcErrorResponse
             {

@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace NativeMcp.Editor.Services
 {
@@ -18,6 +21,15 @@ namespace NativeMcp.Editor.Services
         public bool RequiresPolling { get; set; } = false;
         public string PollAction { get; set; } = "status";
         public bool IsBuiltIn { get; set; }
+
+        /// <summary>Handler delegate (sync). Null if the handler is async.</summary>
+        public Func<JObject, object> SyncHandler { get; set; }
+
+        /// <summary>Handler delegate (async). Null if the handler is sync.</summary>
+        public Func<JObject, Task<object>> AsyncHandler { get; set; }
+
+        /// <summary>True when the handler is asynchronous.</summary>
+        public bool IsAsync => AsyncHandler != null;
     }
 
     /// <summary>

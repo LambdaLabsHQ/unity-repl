@@ -83,7 +83,7 @@ namespace NativeMcp.Editor.Tools
 
                 // ── Resolve target scene(s) ──────────────────────────────
                 var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-                var scenesToQuery = new List<(Scene scene, string label)>();
+                var scenesToQuery = new List<(UnityEngine.SceneManagement.Scene scene, string label)>();
                 string primarySceneName;
 
                 if (prefabStage != null)

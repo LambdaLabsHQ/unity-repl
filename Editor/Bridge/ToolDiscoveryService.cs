@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using NativeMcp.Editor.Constants;
 using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Tools;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
 
 namespace NativeMcp.Editor.Services
@@ -108,7 +110,7 @@ namespace NativeMcp.Editor.Services
                 if (string.IsNullOrEmpty(toolName))
                 {
                     // Derive from class name: CaptureScreenshotTool -> capture_screenshot
-                    toolName = ConvertToSnakeCase(type.Name.Replace("Tool", ""));
+                    toolName = NamingConventions.ToSnakeCase(type.Name.Replace("Tool", ""));
                 }
 
                 // Get description
@@ -116,6 +118,11 @@ namespace NativeMcp.Editor.Services
 
                 // Extract parameters
                 var parameters = ExtractParameters(type);
+
+                // Bind handler delegate
+                Func<JObject, object> syncHandler = null;
+                Func<JObject, Task<object>> asyncHandler = null;
+                BindHandler(type, toolName, out syncHandler, out asyncHandler);
 
                 var metadata = new ToolMetadata
                 {
@@ -128,7 +135,9 @@ namespace NativeMcp.Editor.Services
                     AssemblyName = type.Assembly.GetName().Name,
                     AutoRegister = toolAttr.AutoRegister,
                     RequiresPolling = toolAttr.RequiresPolling,
-                    PollAction = string.IsNullOrEmpty(toolAttr.PollAction) ? "status" : toolAttr.PollAction
+                    PollAction = string.IsNullOrEmpty(toolAttr.PollAction) ? "status" : toolAttr.PollAction,
+                    SyncHandler = syncHandler,
+                    AsyncHandler = asyncHandler
                 };
 
                 metadata.IsBuiltIn = DetermineIsBuiltIn(type, metadata);
@@ -141,6 +150,101 @@ namespace NativeMcp.Editor.Services
                 McpLog.Error($"Failed to extract metadata for {type.Name}: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Find the HandleCommand(JObject) method on the type and bind it as a sync or async delegate.
+        /// </summary>
+        private static void BindHandler(
+            Type type,
+            string toolName,
+            out Func<JObject, object> syncHandler,
+            out Func<JObject, Task<object>> asyncHandler)
+        {
+            syncHandler = null;
+            asyncHandler = null;
+
+            var method = type.GetMethod(
+                "HandleCommand",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { typeof(JObject) },
+                null
+            );
+
+            if (method == null)
+            {
+                McpLog.Warn(
+                    $"MCP tool {type.Name} is marked with [McpForUnityTool] " +
+                    $"but has no public static HandleCommand(JObject) method"
+                );
+                return;
+            }
+
+            try
+            {
+                if (typeof(Task).IsAssignableFrom(method.ReturnType))
+                {
+                    asyncHandler = CreateAsyncHandlerDelegate(method, toolName);
+                }
+                else
+                {
+                    syncHandler = (Func<JObject, object>)Delegate.CreateDelegate(
+                        typeof(Func<JObject, object>),
+                        method
+                    );
+                }
+            }
+            catch (Exception ex)
+            {
+                McpLog.Error($"Failed to bind handler for tool {type.Name}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Create a delegate for an async handler method that returns Task or Task&lt;T&gt;.
+        /// </summary>
+        private static Func<JObject, Task<object>> CreateAsyncHandlerDelegate(MethodInfo method, string commandName)
+        {
+            return async (JObject parameters) =>
+            {
+                object rawResult;
+
+                try
+                {
+                    rawResult = method.Invoke(null, new object[] { parameters });
+                }
+                catch (TargetInvocationException ex)
+                {
+                    throw ex.InnerException ?? ex;
+                }
+
+                if (rawResult == null)
+                {
+                    return null;
+                }
+
+                if (rawResult is not Task task)
+                {
+                    throw new InvalidOperationException(
+                        $"Async handler '{commandName}' returned an object that is not a Task"
+                    );
+                }
+
+                await task.ConfigureAwait(true);
+
+                var taskType = task.GetType();
+                if (taskType.IsGenericType)
+                {
+                    var resultProperty = taskType.GetProperty("Result");
+                    if (resultProperty != null)
+                    {
+                        return resultProperty.GetValue(task);
+                    }
+                }
+
+                return null;
+            };
         }
 
         private List<ParameterMetadata> ExtractParameters(Type type)
@@ -179,7 +283,7 @@ namespace NativeMcp.Editor.Services
             return parameters;
         }
 
-        private string GetParameterType(Type type)
+        internal string GetParameterType(Type type)
         {
             // Handle nullable types
             if (Nullable.GetUnderlyingType(type) != null)
@@ -200,21 +304,6 @@ namespace NativeMcp.Editor.Services
                 return "array";
 
             return "object";
-        }
-
-        private string ConvertToSnakeCase(string input)
-        {
-            if (string.IsNullOrEmpty(input))
-                return input;
-
-            // Convert PascalCase to snake_case
-            var result = System.Text.RegularExpressions.Regex.Replace(
-                input,
-                "([a-z0-9])([A-Z])",
-                "$1_$2"
-            ).ToLower();
-
-            return result;
         }
 
         public void InvalidateCache()

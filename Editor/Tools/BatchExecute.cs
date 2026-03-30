@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
@@ -148,7 +147,7 @@ namespace NativeMcp.Editor.Tools
                 : new ErrorResponse("One or more commands failed.", data);
         }
 
-        private static bool DetermineCallSucceeded(object result)
+        internal static bool DetermineCallSucceeded(object result)
         {
             if (result == null)
             {
@@ -181,7 +180,7 @@ namespace NativeMcp.Editor.Tools
             return true;
         }
 
-        private static JObject NormalizeParameterKeys(JObject source)
+        internal static JObject NormalizeParameterKeys(JObject source)
         {
             if (source == null)
             {
@@ -191,7 +190,7 @@ namespace NativeMcp.Editor.Tools
             var normalized = new JObject();
             foreach (var property in source.Properties())
             {
-                string normalizedName = ToCamelCase(property.Name);
+                string normalizedName = NamingConventions.ToCamelCase(property.Name);
                 normalized[normalizedName] = NormalizeToken(property.Value);
             }
             return normalized;
@@ -215,38 +214,6 @@ namespace NativeMcp.Editor.Tools
                 JArray arr => NormalizeArray(arr),
                 _ => token.DeepClone()
             };
-        }
-
-        private static string ToCamelCase(string key)
-        {
-            if (string.IsNullOrEmpty(key) || key.IndexOf('_') < 0)
-            {
-                return key;
-            }
-
-            var parts = key.Split(new[] { '_' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0)
-            {
-                return key;
-            }
-
-            var builder = new StringBuilder(parts[0]);
-            for (int i = 1; i < parts.Length; i++)
-            {
-                var part = parts[i];
-                if (string.IsNullOrEmpty(part))
-                {
-                    continue;
-                }
-
-                builder.Append(char.ToUpperInvariant(part[0]));
-                if (part.Length > 1)
-                {
-                    builder.Append(part.AsSpan(1));
-                }
-            }
-
-            return builder.ToString();
         }
     }
 }

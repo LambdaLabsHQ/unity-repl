@@ -34,8 +34,9 @@ namespace NativeMcp.Editor.Bridge
         public UnityToolBridge()
         {
             _discovery = new ToolDiscoveryService();
-            // Ensure CommandRegistry is initialized
-            CommandRegistry.Initialize();
+            // Initialize CommandRegistry with the discovery service so tool handlers
+            // are resolved from ToolDiscoveryService (single scan pass).
+            CommandRegistry.Initialize(_discovery);
         }
 
         /// <summary>
