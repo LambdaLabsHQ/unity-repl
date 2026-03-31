@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using NativeMcp.Editor.Bridge;
 using NativeMcp.Editor.Protocol;
 using NativeMcp.Editor.Transport;
@@ -13,8 +15,6 @@ namespace NativeMcp.Editor
     [InitializeOnLoad]
     internal static class NativeMcpServerHost
     {
-        private const int DefaultPort = 8090;
-        private const string PortEditorPrefKey = "NativeMcp_Port";
         private const string AutoStartEditorPrefKey = "NativeMcp_AutoStart";
 
         private static HttpListenerTransport _transport;
@@ -23,7 +23,7 @@ namespace NativeMcp.Editor
         private static UnityToolBridge _toolBridge;
 
         public static bool IsRunning => _transport?.IsRunning ?? false;
-        public static string ServerUrl => _transport?.Url ?? $"http://localhost:{GetPort()}/mcp";
+        public static string ServerUrl => _transport?.Url;
 
         static NativeMcpServerHost()
         {
@@ -37,7 +37,7 @@ namespace NativeMcp.Editor
         }
 
         /// <summary>
-        /// Start the MCP server.
+        /// Start the MCP server with a dynamically allocated port.
         /// </summary>
         public static void StartServer()
         {
@@ -47,7 +47,7 @@ namespace NativeMcp.Editor
                 return;
             }
 
-            int port = GetPort();
+            int port = AllocateAvailablePort();
 
             _sessionManager = new McpSessionManager();
             _toolBridge = new UnityToolBridge();
@@ -57,10 +57,13 @@ namespace NativeMcp.Editor
             try
             {
                 _transport.Start();
+                PortFileManager.WritePortFile(port);
             }
             catch
             {
+                _transport?.Stop();
                 _transport = null;
+                PortFileManager.DeletePortFile();
                 throw;
             }
         }
@@ -68,7 +71,11 @@ namespace NativeMcp.Editor
         /// <summary>
         /// Stop the MCP server.
         /// </summary>
-        public static void StopServer()
+        /// <param name="deletePortFile">
+        /// When true (default), deletes the port file. Pass false during assembly reload
+        /// so the bridge can still discover the port while the server restarts.
+        /// </param>
+        public static void StopServer(bool deletePortFile = true)
         {
             if (_transport == null)
             {
@@ -80,16 +87,11 @@ namespace NativeMcp.Editor
             _protocolHandler = null;
             _sessionManager = null;
             _toolBridge = null;
-        }
 
-        public static int GetPort()
-        {
-            return EditorPrefs.GetInt(PortEditorPrefKey, DefaultPort);
-        }
-
-        public static void SetPort(int port)
-        {
-            EditorPrefs.SetInt(PortEditorPrefKey, port);
+            if (deletePortFile)
+            {
+                PortFileManager.DeletePortFile();
+            }
         }
 
         public static bool GetAutoStart()
@@ -105,6 +107,18 @@ namespace NativeMcp.Editor
         private static void OnEditorQuitting()
         {
             StopServer();
+        }
+
+        /// <summary>
+        /// Allocates an available TCP port by briefly binding to port 0.
+        /// </summary>
+        private static int AllocateAvailablePort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
         }
     }
 }

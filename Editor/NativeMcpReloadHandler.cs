@@ -31,7 +31,7 @@ namespace NativeMcp.Editor
                 if (wasRunning)
                 {
                     Debug.Log("[NativeMcp] Stopping server before assembly reload...");
-                    NativeMcpServerHost.StopServer();
+                    NativeMcpServerHost.StopServer(deletePortFile: false);
                 }
             }
             catch (Exception ex)
