@@ -8,7 +8,7 @@ namespace NativeMcp.Editor.Tools.Prefabs
     /// <summary>
     /// Deprecated stub that forwards to individual prefab_* tools.
     /// </summary>
-    [McpForUnityTool("manage_prefabs", AutoRegister = false)]
+    [McpForUnityTool("manage_prefabs", AutoRegister = false, Internal = true)]
     [Obsolete("Use individual prefab_* tools instead.")]
     public static class ManagePrefabs
     {

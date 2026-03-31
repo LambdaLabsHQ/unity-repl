@@ -9,7 +9,7 @@ namespace NativeMcp.Editor.Tools.Components
     /// <summary>
     /// MCP tool that adds a component to a GameObject.
     /// </summary>
-    [McpForUnityTool("component_add", Description = "Add a component to a GameObject.")]
+    [McpForUnityTool("component_add", Internal = true, Description = "Add a component to a GameObject.")]
     public static class ComponentAdd
     {
         public class Parameters

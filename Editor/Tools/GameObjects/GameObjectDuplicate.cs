@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    [McpForUnityTool("gameobject_duplicate", Description = "Duplicate a GameObject in the scene.")]
+    [McpForUnityTool("gameobject_duplicate", Internal = true, Description = "Duplicate a GameObject in the scene.")]
     public static class GameObjectDuplicate
     {
         public class Parameters

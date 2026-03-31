@@ -19,7 +19,7 @@ namespace NativeMcp.Editor.Tools
     /// Legacy actions (registered dynamic tools):
     ///   - list / call / describe
     /// </summary>
-    [McpForUnityTool("invoke_dynamic",
+    [McpForUnityTool("invoke_dynamic", Internal = true,
         Description = "Reflect-invoke any method or access any property. Two-step workflow: " +
                       "1) action='resolve_method' with method='Type.Member' to inspect candidates. " +
                       "2) action='call_method' with method='Type.ExactName' to execute. " +
@@ -28,6 +28,17 @@ namespace NativeMcp.Editor.Tools
                       "Also supports action='list'/'call'/'describe' for pre-registered dynamic tools.")]
     public static class InvokeDynamic
     {
+        private const BindingFlags ReflectionFlags =
+            BindingFlags.Public | BindingFlags.NonPublic |
+            BindingFlags.Static | BindingFlags.Instance |
+            BindingFlags.FlattenHierarchy;
+
+        private static readonly object CacheLock = new();
+        private static readonly Dictionary<string, Type> ResolvedTypeCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> MissingTypeCache = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<Type, MethodInfo[]> CachedMethodsByType = new();
+        private static readonly Dictionary<Type, PropertyInfo[]> CachedPropertiesByType = new();
+
         public class Parameters
         {
             [ToolParameter("Action: 'resolve_method' (search candidates), 'call_method' (execute), " +
@@ -101,15 +112,10 @@ namespace NativeMcp.Editor.Tools
             if (targetType == null)
                 return new ErrorResponse($"Type '{typePart}' not found. Try full name like 'Namespace.ClassName'.");
 
-            const BindingFlags flags =
-                BindingFlags.Public | BindingFlags.NonPublic |
-                BindingFlags.Static | BindingFlags.Instance |
-                BindingFlags.FlattenHierarchy;
-
             var candidates = new List<object>();
 
             // Properties (case-insensitive)
-            foreach (var p in targetType.GetProperties(flags))
+            foreach (var p in GetPropertiesCached(targetType))
             {
                 if (!string.Equals(p.Name, memberName, StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -126,7 +132,7 @@ namespace NativeMcp.Editor.Tools
             }
 
             // Methods (case-insensitive, skip property accessors)
-            foreach (var m in targetType.GetMethods(flags)
+            foreach (var m in GetMethodsCached(targetType)
                 .Where(m => string.Equals(m.Name, memberName, StringComparison.OrdinalIgnoreCase) && !m.IsSpecialName))
             {
                 candidates.Add(new
@@ -177,17 +183,13 @@ namespace NativeMcp.Editor.Tools
             if (targetType == null)
                 return new ErrorResponse($"Type '{typePart}' not found.");
 
-            const BindingFlags flags =
-                BindingFlags.Public | BindingFlags.NonPublic |
-                BindingFlags.Static | BindingFlags.Instance |
-                BindingFlags.FlattenHierarchy;
-
             var argDict = ParseArgsFromParams(@params);
             if (argDict == null)
                 return new ErrorResponse("Failed to parse 'args'.");
 
             // 1) Try exact property match
-            var prop = targetType.GetProperty(memberName, flags);
+            var prop = GetPropertiesCached(targetType).FirstOrDefault(p =>
+                string.Equals(p.Name, memberName, StringComparison.Ordinal));
             if (prop != null)
             {
                 var accessor = argDict.Count > 0 && prop.CanWrite
@@ -199,7 +201,7 @@ namespace NativeMcp.Editor.Tools
             }
 
             // 2) Try exact method match
-            var candidates = targetType.GetMethods(flags).Where(m => m.Name == memberName).ToArray();
+            var candidates = GetMethodsCached(targetType).Where(m => m.Name == memberName).ToArray();
             if (candidates.Length == 0)
                 return new ErrorResponse($"'{memberName}' not found on '{targetType.Name}'. Use action='resolve_method' to search.");
 
@@ -405,6 +407,52 @@ namespace NativeMcp.Editor.Tools
         /// </summary>
         private static Type ResolveType(string typeName)
         {
+            if (string.IsNullOrWhiteSpace(typeName))
+            {
+                return null;
+            }
+
+            lock (CacheLock)
+            {
+                if (ResolvedTypeCache.TryGetValue(typeName, out var cached))
+                {
+                    return cached;
+                }
+
+                if (MissingTypeCache.Contains(typeName))
+                {
+                    return null;
+                }
+            }
+
+            // Fast path: reuse shared type resolver first.
+            var resolved = UnityTypeResolver.ResolveAny(typeName);
+
+            // Keep backward-compat behavior for legacy callers by falling back to
+            // broader fuzzy matching if the shared resolver cannot find a match.
+            if (resolved == null)
+            {
+                resolved = ResolveTypeLegacy(typeName);
+            }
+
+            lock (CacheLock)
+            {
+                if (resolved != null)
+                {
+                    ResolvedTypeCache[typeName] = resolved;
+                    MissingTypeCache.Remove(typeName);
+                }
+                else
+                {
+                    MissingTypeCache.Add(typeName);
+                }
+            }
+
+            return resolved;
+        }
+
+        private static Type ResolveTypeLegacy(string typeName)
+        {
             // 1) Exact match
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
@@ -450,6 +498,36 @@ namespace NativeMcp.Editor.Tools
             }
 
             return bestMatch;
+        }
+
+        private static MethodInfo[] GetMethodsCached(Type type)
+        {
+            lock (CacheLock)
+            {
+                if (CachedMethodsByType.TryGetValue(type, out var methods))
+                {
+                    return methods;
+                }
+
+                methods = type.GetMethods(ReflectionFlags);
+                CachedMethodsByType[type] = methods;
+                return methods;
+            }
+        }
+
+        private static PropertyInfo[] GetPropertiesCached(Type type)
+        {
+            lock (CacheLock)
+            {
+                if (CachedPropertiesByType.TryGetValue(type, out var properties))
+                {
+                    return properties;
+                }
+
+                properties = type.GetProperties(ReflectionFlags);
+                CachedPropertiesByType[type] = properties;
+                return properties;
+            }
         }
 
         /// <summary>

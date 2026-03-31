@@ -7,7 +7,7 @@ using UnityEditorInternal;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_add_tag", Description = "Add a new tag to the project.")]
+    [McpForUnityTool("editor_add_tag", Internal = true, Description = "Add a new tag to the project.")]
     public static class EditorAddTag
     {
         public class Parameters

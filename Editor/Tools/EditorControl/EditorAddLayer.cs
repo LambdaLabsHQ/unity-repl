@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_add_layer", Description = "Add a new layer to the project.")]
+    [McpForUnityTool("editor_add_layer", Internal = true, Description = "Add a new layer to the project.")]
     public static class EditorAddLayer
     {
         public class Parameters

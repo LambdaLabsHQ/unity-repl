@@ -9,7 +9,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Get all scenes configured in Build Settings.
     /// </summary>
-    [McpForUnityTool("scene_get_build_settings", Description = "Get all scenes configured in Build Settings.")]
+    [McpForUnityTool("scene_get_build_settings", Internal = true, Description = "Get all scenes configured in Build Settings.")]
     public static class SceneGetBuildSettings
     {
         public static object HandleCommand(JObject @params)

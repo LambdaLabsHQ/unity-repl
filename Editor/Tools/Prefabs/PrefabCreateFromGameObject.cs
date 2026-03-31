@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.Prefabs
 {
-    [McpForUnityTool("prefab_create_from_gameobject", Description = "Create a new prefab asset from an existing scene GameObject.")]
+    [McpForUnityTool("prefab_create_from_gameobject", Internal = true, Description = "Create a new prefab asset from an existing scene GameObject.")]
     public static class PrefabCreateFromGameObject
     {
         public class Parameters

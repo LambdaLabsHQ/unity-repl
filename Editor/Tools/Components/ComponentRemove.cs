@@ -9,7 +9,7 @@ namespace NativeMcp.Editor.Tools.Components
     /// <summary>
     /// MCP tool that removes a component from a GameObject.
     /// </summary>
-    [McpForUnityTool("component_remove", Description = "Remove a component from a GameObject.")]
+    [McpForUnityTool("component_remove", Internal = true, Description = "Remove a component from a GameObject.")]
     public static class ComponentRemove
     {
         public class Parameters

@@ -7,7 +7,7 @@ using UnityEditorInternal;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_remove_tag", Description = "Remove an existing tag from the project.")]
+    [McpForUnityTool("editor_remove_tag", Internal = true, Description = "Remove an existing tag from the project.")]
     public static class EditorRemoveTag
     {
         public class Parameters

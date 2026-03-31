@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    [McpForUnityTool("gameobject_create", Description = "Create a new GameObject in the scene.")]
+    [McpForUnityTool("gameobject_create", Internal = true, Description = "Create a new GameObject in the scene.")]
     public static class GameObjectCreate
     {
         public class Parameters

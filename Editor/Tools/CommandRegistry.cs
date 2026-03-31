@@ -9,6 +9,7 @@ using NativeMcp.Editor.Resources;
 using NativeMcp.Editor.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 
 namespace NativeMcp.Editor.Tools
 {
@@ -182,16 +183,7 @@ namespace NativeMcp.Editor.Tools
         {
             try
             {
-                var allTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic)
-                    .SelectMany(a =>
-                    {
-                        try { return a.GetTypes(); }
-                        catch { return new Type[0]; }
-                    })
-                    .ToList();
-
-                var resourceTypes = allTypes.Where(t => t.GetCustomAttribute<McpForUnityResourceAttribute>() != null);
+                var resourceTypes = TypeCache.GetTypesWithAttribute<McpForUnityResourceAttribute>();
                 int resourceCount = 0;
                 foreach (var type in resourceTypes)
                 {
@@ -199,7 +191,7 @@ namespace NativeMcp.Editor.Tools
                         resourceCount++;
                 }
 
-                McpLog.Info($"Auto-discovered {resourceCount} resources");
+                McpLog.Info($"Auto-discovered {resourceCount} resources via TypeCache");
             }
             catch (Exception ex)
             {

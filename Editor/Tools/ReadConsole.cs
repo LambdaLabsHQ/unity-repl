@@ -14,7 +14,7 @@ namespace NativeMcp.Editor.Tools
     /// Handles reading and clearing Unity Editor console log entries.
     /// Uses reflection to access internal LogEntry methods/properties.
     /// </summary>
-    [McpForUnityTool("read_console")]
+    [McpForUnityTool("read_console", Internal = true)]
     public static class ReadConsole
     {
         // (Calibration removed)

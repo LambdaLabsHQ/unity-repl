@@ -10,7 +10,7 @@ namespace NativeMcp.Editor.Tools
     /// Executes multiple MCP commands within a single Unity-side handler. Commands are executed sequentially
     /// on the main thread to preserve determinism and Unity API safety.
     /// </summary>
-    [McpForUnityTool("batch_execute")]
+    [McpForUnityTool("batch_execute", Internal = true)]
     public static class BatchExecute
     {
         private const int MaxCommandsPerBatch = 25;

@@ -10,7 +10,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Capture a screenshot from the current camera view.
     /// </summary>
-    [McpForUnityTool("scene_screenshot", Description = "Capture a screenshot from the current camera view.")]
+    [McpForUnityTool("scene_screenshot", Internal = true, Description = "Capture a screenshot from the current camera view.")]
     public static class SceneScreenshot
     {
         public class Parameters

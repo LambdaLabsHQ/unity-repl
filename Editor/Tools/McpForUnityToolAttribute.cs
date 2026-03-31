@@ -31,6 +31,13 @@ namespace NativeMcp.Editor.Tools
         public bool AutoRegister { get; set; } = true;
 
         /// <summary>
+        /// When true, the tool is registered internally (callable by meta-tools
+        /// and batch_execute via CommandRegistry) but hidden from the MCP
+        /// tools/list response and blocked from external tools/call.
+        /// </summary>
+        public bool Internal { get; set; } = false;
+
+        /// <summary>
         /// Enables the polling middleware for long-running tools. When true, Unity
         /// should return a PendingResponse and the server will poll using
         /// <see cref="PollAction"/> until completion.

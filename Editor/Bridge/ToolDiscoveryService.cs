@@ -73,6 +73,13 @@ namespace NativeMcp.Editor.Services
                 .ToList();
         }
 
+        public List<ToolMetadata> GetExposedTools()
+        {
+            return GetEnabledTools()
+                .Where(tool => !tool.Internal)
+                .ToList();
+        }
+
         public bool IsToolEnabled(string toolName)
         {
             if (string.IsNullOrEmpty(toolName))
@@ -134,6 +141,7 @@ namespace NativeMcp.Editor.Services
                     Namespace = type.Namespace ?? "",
                     AssemblyName = type.Assembly.GetName().Name,
                     AutoRegister = toolAttr.AutoRegister,
+                    Internal = toolAttr.Internal,
                     RequiresPolling = toolAttr.RequiresPolling,
                     PollAction = string.IsNullOrEmpty(toolAttr.PollAction) ? "status" : toolAttr.PollAction,
                     SyncHandler = syncHandler,

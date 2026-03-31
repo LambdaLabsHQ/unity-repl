@@ -11,7 +11,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Save the current scene, optionally to a new path.
     /// </summary>
-    [McpForUnityTool("scene_save", Description = "Save the current scene, optionally to a new path.")]
+    [McpForUnityTool("scene_save", Internal = true, Description = "Save the current scene, optionally to a new path.")]
     public static class SceneSave
     {
         public class Parameters

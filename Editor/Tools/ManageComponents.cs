@@ -12,7 +12,7 @@ namespace NativeMcp.Editor.Tools
     /// Kept for backward compatibility. New callers should use the individual tools directly.
     /// </summary>
     [Obsolete("Use individual component_* tools instead.")]
-    [McpForUnityTool("manage_components", AutoRegister = false)]
+    [McpForUnityTool("manage_components", AutoRegister = false, Internal = true)]
     public static class ManageComponents
     {
         /// <summary>

@@ -29,7 +29,7 @@ namespace NativeMcp.Editor.Tools.Testing
     /// monitors for timeout. <see cref="EditorNudge"/> keeps the editor ticking when backgrounded.
     /// </para>
     /// </summary>
-    [McpForUnityTool("run_tests", Description =
+    [McpForUnityTool("run_tests", Internal = true, Description =
         "Runs Unity Test Runner tests and returns results. " +
         "Supports EditMode (synchronous) and PlayMode (asynchronous) tests. " +
         "When no filter is provided, runs all tests for the given mode. " +

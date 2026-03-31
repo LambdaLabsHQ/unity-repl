@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.Prefabs
 {
-    [McpForUnityTool("prefab_open_stage", Description = "Open a prefab in isolation mode for editing.")]
+    [McpForUnityTool("prefab_open_stage", Internal = true, Description = "Open a prefab in isolation mode for editing.")]
     public static class PrefabOpenStage
     {
         public class Parameters

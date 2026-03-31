@@ -11,7 +11,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Get a paged hierarchy of GameObjects in the active scene or prefab stage.
     /// </summary>
-    [McpForUnityTool("scene_get_hierarchy", Description = "Get a paged hierarchy of GameObjects in the active scene or prefab stage.")]
+    [McpForUnityTool("scene_get_hierarchy", Internal = true, Description = "Get a paged hierarchy of GameObjects in the active scene or prefab stage.")]
     public static class SceneGetHierarchy
     {
         public class Parameters

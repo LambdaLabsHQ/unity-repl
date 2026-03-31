@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_play", Description = "Enter Unity play mode.")]
+    [McpForUnityTool("editor_play", Internal = true, Description = "Enter Unity play mode.")]
     public static class EditorPlay
     {
         public static object HandleCommand(JObject @params)

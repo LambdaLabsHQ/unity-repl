@@ -8,7 +8,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Get information about the currently active scene.
     /// </summary>
-    [McpForUnityTool("scene_get_active", Description = "Get information about the currently active scene.")]
+    [McpForUnityTool("scene_get_active", Internal = true, Description = "Get information about the currently active scene.")]
     public static class SceneGetActive
     {
         public static object HandleCommand(JObject @params)

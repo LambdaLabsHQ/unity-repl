@@ -5,7 +5,7 @@ using UnityEditor.SceneManagement;
 
 namespace NativeMcp.Editor.Tools.Prefabs
 {
-    [McpForUnityTool("prefab_save_stage", Description = "Save the currently open prefab stage.")]
+    [McpForUnityTool("prefab_save_stage", Internal = true, Description = "Save the currently open prefab stage.")]
     public static class PrefabSaveStage
     {
         public static object HandleCommand(JObject @params)

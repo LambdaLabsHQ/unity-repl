@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_remove_layer", Description = "Remove a user layer from the project.")]
+    [McpForUnityTool("editor_remove_layer", Internal = true, Description = "Remove a user layer from the project.")]
     public static class EditorRemoveLayer
     {
         public class Parameters

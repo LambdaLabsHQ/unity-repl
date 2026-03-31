@@ -12,7 +12,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Create a new empty Unity scene at the specified path.
     /// </summary>
-    [McpForUnityTool("scene_create", Description = "Create a new empty Unity scene at the specified path.")]
+    [McpForUnityTool("scene_create", Internal = true, Description = "Create a new empty Unity scene at the specified path.")]
     public static class SceneCreate
     {
         public class Parameters

@@ -23,7 +23,7 @@ namespace NativeMcp.Editor.Tools.Testing
     /// the editor keeps ticking while waiting for the callback, even when backgrounded.
     /// </para>
     /// </summary>
-    [McpForUnityTool("list_tests", Description =
+    [McpForUnityTool("list_tests", Internal = true, Description =
         "Retrieves the list of available Unity tests. " +
         "Returns all runnable test methods with their fully qualified names and categories. " +
         "Use testMode to choose EditMode or PlayMode tests.")]

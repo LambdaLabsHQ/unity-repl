@@ -22,6 +22,13 @@ namespace NativeMcp.Editor.Services
         public string PollAction { get; set; } = "status";
         public bool IsBuiltIn { get; set; }
 
+        /// <summary>
+        /// When true, the tool is only callable internally (via meta-tools / batch).
+        /// It will not appear in the MCP tools/list response and external tools/call
+        /// requests for it will be rejected.
+        /// </summary>
+        public bool Internal { get; set; }
+
         /// <summary>Handler delegate (sync). Null if the handler is async.</summary>
         public Func<JObject, object> SyncHandler { get; set; }
 
@@ -63,6 +70,12 @@ namespace NativeMcp.Editor.Services
         /// Returns only the tools currently enabled for registration
         /// </summary>
         List<ToolMetadata> GetEnabledTools();
+
+        /// <summary>
+        /// Returns enabled tools that are not marked as Internal.
+        /// These are the tools exposed in the MCP tools/list response.
+        /// </summary>
+        List<ToolMetadata> GetExposedTools();
 
         /// <summary>
         /// Checks whether a tool is currently enabled for registration

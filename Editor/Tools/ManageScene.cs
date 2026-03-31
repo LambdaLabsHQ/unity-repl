@@ -11,7 +11,7 @@ namespace NativeMcp.Editor.Tools
     /// Kept for backward compatibility with clients that still send "manage_scene" commands.
     /// </summary>
     [Obsolete("Use individual scene_* tools instead.")]
-    [McpForUnityTool("manage_scene", AutoRegister = false)]
+    [McpForUnityTool("manage_scene", AutoRegister = false, Internal = true)]
     public static class ManageScene
     {
         private static readonly Dictionary<string, string> ActionToToolName = new()

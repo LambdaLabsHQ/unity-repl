@@ -9,7 +9,7 @@ namespace NativeMcp.Editor.Tools
     /// Kept for backward compatibility only.
     /// </summary>
     [Obsolete("Use individual editor_* tools instead.")]
-    [McpForUnityTool("manage_editor", AutoRegister = false)]
+    [McpForUnityTool("manage_editor", AutoRegister = false, Internal = true)]
     public static class ManageEditor
     {
         public static object HandleCommand(JObject @params)

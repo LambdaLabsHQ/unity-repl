@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    [McpForUnityTool("gameobject_modify", Description = "Modify properties of an existing GameObject (name, tag, layer, transform, parent, active state).")]
+    [McpForUnityTool("gameobject_modify", Internal = true, Description = "Modify properties of an existing GameObject (name, tag, layer, transform, parent, active state).")]
     public static class GameObjectModify
     {
         public class Parameters

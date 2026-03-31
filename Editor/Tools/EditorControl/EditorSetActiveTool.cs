@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_set_active_tool", Description = "Set the active editor tool (View, Move, Rotate, Scale, Rect, Transform).")]
+    [McpForUnityTool("editor_set_active_tool", Internal = true, Description = "Set the active editor tool (View, Move, Rotate, Scale, Rect, Transform).")]
     public static class EditorSetActiveTool
     {
         public class Parameters

@@ -11,7 +11,7 @@ namespace NativeMcp.Editor.Tools.Scene
     /// <summary>
     /// Load an existing scene by name/path or build index.
     /// </summary>
-    [McpForUnityTool("scene_load", Description = "Load an existing scene by name/path or build index.")]
+    [McpForUnityTool("scene_load", Internal = true, Description = "Load an existing scene by name/path or build index.")]
     public static class SceneLoad
     {
         public class Parameters

@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    [McpForUnityTool("gameobject_move_relative", Description = "Move a GameObject relative to its siblings under the same parent.")]
+    [McpForUnityTool("gameobject_move_relative", Internal = true, Description = "Move a GameObject relative to its siblings under the same parent.")]
     public static class GameObjectMoveRelative
     {
         public class Parameters

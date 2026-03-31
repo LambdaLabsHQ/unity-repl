@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_pause", Description = "Toggle pause/resume in play mode.")]
+    [McpForUnityTool("editor_pause", Internal = true, Description = "Toggle pause/resume in play mode.")]
     public static class EditorPause
     {
         public static object HandleCommand(JObject @params)

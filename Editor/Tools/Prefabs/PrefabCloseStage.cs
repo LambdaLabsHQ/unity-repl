@@ -5,7 +5,7 @@ using UnityEditor.SceneManagement;
 
 namespace NativeMcp.Editor.Tools.Prefabs
 {
-    [McpForUnityTool("prefab_close_stage", Description = "Close the currently open prefab stage.")]
+    [McpForUnityTool("prefab_close_stage", Internal = true, Description = "Close the currently open prefab stage.")]
     public static class PrefabCloseStage
     {
         public class Parameters

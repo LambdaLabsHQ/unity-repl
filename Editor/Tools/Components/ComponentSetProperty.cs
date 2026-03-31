@@ -10,7 +10,7 @@ namespace NativeMcp.Editor.Tools.Components
     /// <summary>
     /// MCP tool that sets one or more properties on a component attached to a GameObject.
     /// </summary>
-    [McpForUnityTool("component_set_property", Description = "Set one or more properties on a component.")]
+    [McpForUnityTool("component_set_property", Internal = true, Description = "Set one or more properties on a component.")]
     public static class ComponentSetProperty
     {
         public class Parameters

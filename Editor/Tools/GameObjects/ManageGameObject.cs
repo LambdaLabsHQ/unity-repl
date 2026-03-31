@@ -9,7 +9,7 @@ namespace NativeMcp.Editor.Tools.GameObjects
     /// <summary>
     /// Deprecated stub that forwards to individual gameobject_* tools.
     /// </summary>
-    [McpForUnityTool("manage_gameobject", AutoRegister = false)]
+    [McpForUnityTool("manage_gameobject", AutoRegister = false, Internal = true)]
     [Obsolete("Use individual gameobject_* tools instead.")]
     public static class ManageGameObject
     {

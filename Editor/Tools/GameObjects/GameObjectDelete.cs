@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    [McpForUnityTool("gameobject_delete", Description = "Delete one or more GameObjects from the scene.")]
+    [McpForUnityTool("gameobject_delete", Internal = true, Description = "Delete one or more GameObjects from the scene.")]
     public static class GameObjectDelete
     {
         public class Parameters

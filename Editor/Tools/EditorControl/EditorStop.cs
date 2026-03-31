@@ -6,7 +6,7 @@ using UnityEditor;
 
 namespace NativeMcp.Editor.Tools.EditorControl
 {
-    [McpForUnityTool("editor_stop", Description = "Exit Unity play mode.")]
+    [McpForUnityTool("editor_stop", Internal = true, Description = "Exit Unity play mode.")]
     public static class EditorStop
     {
         public static object HandleCommand(JObject @params)
