@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using NativeMcp.Editor.Bridge;
+using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Protocol;
 using NativeMcp.Editor.Transport;
 using UnityEditor;
@@ -15,7 +16,7 @@ namespace NativeMcp.Editor
     [InitializeOnLoad]
     internal static class NativeMcpServerHost
     {
-        private const string AutoStartEditorPrefKey = "NativeMcp_AutoStart";
+        private const string AutoStartEditorPrefKey = NativeMcpKeys.AutoStart;
 
         private static HttpListenerTransport _transport;
         private static McpProtocolHandler _protocolHandler;
@@ -47,12 +48,20 @@ namespace NativeMcp.Editor
                 return;
             }
 
-            int port = AllocateAvailablePort();
+            int savedPort = SessionState.GetInt(NativeMcpKeys.LastPort, 0);
+            SessionState.EraseInt(NativeMcpKeys.LastPort);
+
+            int port;
+            if (savedPort > 0 && IsPortAvailable(savedPort))
+                port = savedPort;
+            else
+                port = AllocateAvailablePort();
 
             _sessionManager = new McpSessionManager();
             _toolBridge = new UnityToolBridge();
-            _protocolHandler = new McpProtocolHandler(_toolBridge);
-            _transport = new HttpListenerTransport(_protocolHandler, _sessionManager, port);
+            var ctx = new NativeMcp.Editor.Transport.McpCancellationContext();
+            _protocolHandler = new McpProtocolHandler(_toolBridge, ctx);
+            _transport = new HttpListenerTransport(_protocolHandler, _sessionManager, port, ctx: ctx);
 
             try
             {
@@ -75,14 +84,24 @@ namespace NativeMcp.Editor
         /// When true (default), deletes the port file. Pass false during assembly reload
         /// so the bridge can still discover the port while the server restarts.
         /// </param>
-        public static void StopServer(bool deletePortFile = true)
+        /// <param name="reason">
+        /// Optional reason for stopping. Pass "domain_reload" when stopping due to an assembly
+        /// reload so that in-flight requests can signal clients to wait and retry.
+        /// </param>
+        public static void StopServer(bool deletePortFile = true, string reason = null)
         {
             if (_transport == null)
             {
                 return;
             }
 
-            _transport.Stop();
+            if (!deletePortFile)
+            {
+                // Domain reload: remember port for reuse so bridge doesn't lose connection
+                SessionState.SetInt(NativeMcpKeys.LastPort, _transport.Port);
+            }
+
+            _transport.Stop(reason);
             _transport = null;
             _protocolHandler = null;
             _sessionManager = null;
@@ -119,6 +138,24 @@ namespace NativeMcp.Editor
             int port = ((IPEndPoint)listener.LocalEndpoint).Port;
             listener.Stop();
             return port;
+        }
+
+        /// <summary>
+        /// Checks whether a specific port is available by attempting to bind to it.
+        /// </summary>
+        private static bool IsPortAvailable(int port)
+        {
+            try
+            {
+                var listener = new TcpListener(IPAddress.Loopback, port);
+                listener.Start();
+                listener.Stop();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

@@ -1,5 +1,9 @@
 using System;
+using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 using NativeMcp.Editor.Bridge;
 using NativeMcp.Editor.Helpers;
@@ -37,6 +41,16 @@ namespace NativeMcp.Editor.Tools.Testing
     public static class RunTests
     {
         private const int DefaultTimeoutSeconds = 120;
+        private const string PendingTestRunKey = NativeMcpKeys.PendingTestRun;
+
+        [Serializable]
+        private struct PendingTestRun
+        {
+            public string testMode;
+            public string filterHash;
+            public string startTimeUtc;
+            public string resultFilePath;
+        }
 
         public class Parameters
         {
@@ -85,6 +99,11 @@ namespace NativeMcp.Editor.Tools.Testing
         /// </returns>
         public static async Task<object> HandleCommand(JObject @params)
         {
+            TestRunnerApi api = null;
+            TestResultCollector collector = null;
+            EditorApplication.CallbackFunction tick = null;
+            bool nudgeStarted = false;
+
             try
             {
                 // ── Parse parameters ──────────────────────────────────────────
@@ -97,6 +116,10 @@ namespace NativeMcp.Editor.Tools.Testing
                         $"Invalid testMode '{testModeStr}'. Use 'EditMode' or 'PlayMode'.");
                 }
 
+                bool isEditMode = (testMode & TestMode.EditMode) != 0
+                                  && (testMode & TestMode.PlayMode) == 0;
+                string canonicalMode = isEditMode ? "EditMode" : "PlayMode";
+
                 string[] testNames = ParseStringArray(
                     @params?["testNames"] ?? @params?["test_names"]);
                 string[] categoryNames = ParseStringArray(
@@ -107,6 +130,34 @@ namespace NativeMcp.Editor.Tools.Testing
                     @params?["timeoutSeconds"] ?? @params?["timeout_seconds"],
                     DefaultTimeoutSeconds);
 
+                // ── PlayMode recovery: check for pending test run after domain reload ──
+                if (!isEditMode)
+                {
+                    string currentHash = ComputeFilterHash(canonicalMode, testNames, categoryNames, assemblyNames);
+                    string pending = SessionState.GetString(PendingTestRunKey, "");
+                    if (!string.IsNullOrEmpty(pending))
+                    {
+                        var info = JsonUtility.FromJson<PendingTestRun>(pending);
+                        if (info.testMode == canonicalMode && info.filterHash == currentHash)
+                        {
+                            Debug.Log("[NativeMcp] Pending PlayMode test run detected after domain reload, polling for TestResults.xml...");
+                            var recovered = await PollForTestResults(info, timeoutSeconds);
+                            SessionState.EraseString(PendingTestRunKey);
+                            if (recovered != null)
+                            {
+                                Debug.Log($"[NativeMcp] PlayMode test results recovered from {info.resultFilePath}");
+                                return recovered;
+                            }
+                            Debug.LogWarning("[NativeMcp] TestResults.xml not found within timeout, re-running tests");
+                        }
+                        else
+                        {
+                            Debug.Log("[NativeMcp] Clearing stale pending test run marker (different request)");
+                            SessionState.EraseString(PendingTestRunKey);
+                        }
+                    }
+                }
+
                 // ── Build filter and execution settings ───────────────────────
                 var filter = new Filter
                 {
@@ -116,19 +167,29 @@ namespace NativeMcp.Editor.Tools.Testing
                     assemblyNames = assemblyNames
                 };
 
-                bool isEditMode = (testMode & TestMode.EditMode) != 0
-                                  && (testMode & TestMode.PlayMode) == 0;
                 var settings = new ExecutionSettings(filter)
                 {
                     runSynchronously = isEditMode
                 };
 
+                // ── Mark pending run for PlayMode (before Execute, survives domain reload) ──
+                if (!isEditMode)
+                {
+                    string filterHash = ComputeFilterHash(canonicalMode, testNames, categoryNames, assemblyNames);
+                    SessionState.SetString(PendingTestRunKey, JsonUtility.ToJson(new PendingTestRun
+                    {
+                        testMode = canonicalMode,
+                        filterHash = filterHash,
+                        startTimeUtc = DateTime.UtcNow.ToString("o"),
+                        resultFilePath = Path.Combine(Application.persistentDataPath, "TestResults.xml")
+                    }));
+                }
+
                 // ── Set up API and callbacks ──────────────────────────────────
-                var api = ScriptableObject.CreateInstance<TestRunnerApi>();
+                api = ScriptableObject.CreateInstance<TestRunnerApi>();
                 var tcs = new TaskCompletionSource<object>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
 
-                TestResultCollector collector = null;
                 collector = new TestResultCollector(onFinished: () =>
                 {
                     tcs.TrySetResult(BuildSuccessResponse(testModeStr, collector));
@@ -141,7 +202,6 @@ namespace NativeMcp.Editor.Tools.Testing
 
                 if (isEditMode && collector.IsFinished)
                 {
-                    // Synchronous execution completed immediately
                     api.UnregisterCallbacks(collector);
                     UnityEngine.Object.DestroyImmediate(api);
                     return BuildSuccessResponse(testModeStr, collector);
@@ -151,23 +211,17 @@ namespace NativeMcp.Editor.Tools.Testing
                 var start = DateTime.UtcNow;
                 var timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
-                void Tick()
+                tick = () =>
                 {
                     if (tcs.Task.IsCompleted)
                     {
-                        EditorApplication.update -= Tick;
-                        EditorNudge.EndNudge();
-                        api.UnregisterCallbacks(collector);
-                        UnityEngine.Object.DestroyImmediate(api);
+                        CleanupTestRun(tick, api, collector, nudgeStarted);
                         return;
                     }
 
                     if ((DateTime.UtcNow - start) > timeout)
                     {
-                        EditorApplication.update -= Tick;
-                        EditorNudge.EndNudge();
-                        api.UnregisterCallbacks(collector);
-                        UnityEngine.Object.DestroyImmediate(api);
+                        CleanupTestRun(tick, api, collector, nudgeStarted);
                         tcs.TrySetResult(new ErrorResponse("test_run_timeout", new
                         {
                             timeoutSeconds,
@@ -182,17 +236,32 @@ namespace NativeMcp.Editor.Tools.Testing
                             }
                         }));
                     }
-                }
+                };
 
-                EditorApplication.update += Tick;
+                EditorApplication.update += tick;
                 EditorNudge.BeginNudge();
+                nudgeStarted = true;
                 return await tcs.Task;
             }
             catch (Exception ex)
             {
+                CleanupTestRun(tick, api, collector, nudgeStarted);
                 McpLog.Error($"[RunTests] {ex.Message}");
                 return new ErrorResponse($"Error running tests: {ex.Message}");
             }
+        }
+
+        private static void CleanupTestRun(
+            EditorApplication.CallbackFunction tick,
+            TestRunnerApi api,
+            TestResultCollector collector,
+            bool nudgeStarted)
+        {
+            if (tick != null) EditorApplication.update -= tick;
+            if (nudgeStarted) EditorNudge.EndNudge();
+            SessionState.EraseString(PendingTestRunKey);
+            if (api != null && collector != null) api.UnregisterCallbacks(collector);
+            if (api != null) UnityEngine.Object.DestroyImmediate(api);
         }
 
         /// <summary>
@@ -229,7 +298,7 @@ namespace NativeMcp.Editor.Tools.Testing
         /// Parses a string test mode into the <see cref="TestMode"/> enum.
         /// Accepts "EditMode", "edit_mode", "PlayMode", "play_mode" (case-insensitive).
         /// </summary>
-        private static bool TryParseTestMode(string str, out TestMode mode)
+        internal static bool TryParseTestMode(string str, out TestMode mode)
         {
             if (string.IsNullOrEmpty(str))
             {
@@ -257,7 +326,7 @@ namespace NativeMcp.Editor.Tools.Testing
         /// Returns null if the token is null or not an array, which means "no filter"
         /// (all tests match). An empty array is treated the same as null.
         /// </summary>
-        private static string[] ParseStringArray(JToken token)
+        internal static string[] ParseStringArray(JToken token)
         {
             if (token == null) return null;
 
@@ -270,6 +339,64 @@ namespace NativeMcp.Editor.Tools.Testing
             // Single string value — wrap in array for convenience
             string single = token.ToString();
             return string.IsNullOrEmpty(single) ? null : new[] { single };
+        }
+
+        /// <summary>
+        /// Computes a deterministic hash string from filter parameters to match recovery requests.
+        /// Uses SHA-256 (first 8 hex chars) for stability across .NET versions.
+        /// </summary>
+        internal static string ComputeFilterHash(string testMode, string[] testNames,
+            string[] categoryNames, string[] assemblyNames)
+        {
+            string joined = string.Join("\x1F",
+                testMode ?? "",
+                testNames != null ? string.Join("\x1E", testNames) : "",
+                categoryNames != null ? string.Join("\x1E", categoryNames) : "",
+                assemblyNames != null ? string.Join("\x1E", assemblyNames) : "");
+            using (var sha = SHA256.Create())
+            {
+                var bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(joined));
+                return BitConverter.ToString(bytes, 0, 4).Replace("-", "").ToLowerInvariant();
+            }
+        }
+
+        /// <summary>
+        /// Polls for TestResults.xml written by Unity Test Runner after a domain reload.
+        /// Returns a parsed <see cref="SuccessResponse"/> if the file is found and updated
+        /// after the pending run's start time, or null on timeout.
+        /// </summary>
+        private static async Task<object> PollForTestResults(PendingTestRun info, int timeoutSeconds)
+        {
+            var startTime = DateTime.Parse(info.startTimeUtc, null,
+                DateTimeStyles.RoundtripKind);
+            var deadline = DateTime.UtcNow.AddSeconds(Math.Max(timeoutSeconds, 30));
+
+            while (DateTime.UtcNow < deadline)
+            {
+                if (File.Exists(info.resultFilePath))
+                {
+                    var mtime = File.GetLastWriteTimeUtc(info.resultFilePath);
+                    if (mtime > startTime)
+                    {
+                        try
+                        {
+                            return TestResultXmlParser.Parse(info.resultFilePath, info.testMode);
+                        }
+                        catch (IOException ex)
+                        {
+                            Debug.LogWarning($"[NativeMcp] TestResults.xml read failed (will retry): {ex.Message}");
+                        }
+                        catch (System.Xml.XmlException ex)
+                        {
+                            Debug.LogWarning($"[NativeMcp] TestResults.xml parse failed (will retry): {ex.Message}");
+                        }
+                    }
+                }
+
+                await Task.Delay(1000);
+            }
+
+            return null;
         }
     }
 }

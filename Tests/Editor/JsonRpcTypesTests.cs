@@ -103,6 +103,7 @@ namespace NativeMcp.Editor.Tests
             Assert.AreEqual(-32601, JsonRpcErrorCodes.MethodNotFound);
             Assert.AreEqual(-32602, JsonRpcErrorCodes.InvalidParams);
             Assert.AreEqual(-32603, JsonRpcErrorCodes.InternalError);
+            Assert.AreEqual(-32001, JsonRpcErrorCodes.DomainReloadCancelled);
         }
     }
 }

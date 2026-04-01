@@ -1,4 +1,8 @@
+using System.Threading;
+using System.Threading.Tasks;
+using NativeMcp.Editor.Bridge;
 using NativeMcp.Editor.Protocol;
+using NativeMcp.Editor.Transport;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 
@@ -111,6 +115,54 @@ namespace NativeMcp.Editor.Tests
             var parsed = JObject.Parse(json);
 
             Assert.AreEqual("extra info", parsed["error"]?["data"]?["detail"]?.ToString());
+        }
+
+        // --- OperationCanceledException handling ---
+
+        [Test]
+        public async Task HandleRequestAsync_CancelledWithReason_ReturnsDomainReloadCancelled()
+        {
+            var ctx = new McpCancellationContext();
+            ctx.Cancel("domain_reload");
+            var handler = new McpProtocolHandler(new UnityToolBridge(), ctx);
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var request = new JsonRpcRequest
+            {
+                Method = "ping",
+                Id = new JValue(1)
+            };
+
+            string json = await handler.HandleRequestAsync(request, cts.Token);
+            var parsed = JObject.Parse(json);
+
+            Assert.AreEqual(JsonRpcErrorCodes.DomainReloadCancelled, parsed["error"]?["code"]?.Value<int>());
+            Assert.AreEqual("Request cancelled", parsed["error"]?["message"]?.ToString());
+            Assert.AreEqual("domain_reload", parsed["error"]?["data"]?["reason"]?.ToString());
+        }
+
+        [Test]
+        public async Task HandleRequestAsync_CancelledWithoutReason_ReturnsInternalError()
+        {
+            var handler = new McpProtocolHandler(new UnityToolBridge(), new McpCancellationContext());
+
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            var request = new JsonRpcRequest
+            {
+                Method = "ping",
+                Id = new JValue(2)
+            };
+
+            string json = await handler.HandleRequestAsync(request, cts.Token);
+            var parsed = JObject.Parse(json);
+
+            Assert.AreEqual(JsonRpcErrorCodes.InternalError, parsed["error"]?["code"]?.Value<int>());
+            Assert.AreEqual("Request cancelled", parsed["error"]?["message"]?.ToString());
+            Assert.IsTrue(parsed["error"]?["data"] == null || parsed["error"]?["data"]?.Type == JTokenType.Null);
         }
     }
 }

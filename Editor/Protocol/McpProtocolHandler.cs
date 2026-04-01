@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NativeMcp.Editor.Bridge;
+using NativeMcp.Editor.Transport;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -20,11 +21,13 @@ namespace NativeMcp.Editor.Protocol
         private const string ServerVersion = "0.1.0";
 
         private readonly UnityToolBridge _toolBridge;
+        private readonly McpCancellationContext _ctx;
         private bool _initialized;
 
-        public McpProtocolHandler(UnityToolBridge toolBridge)
+        public McpProtocolHandler(UnityToolBridge toolBridge, McpCancellationContext ctx = null)
         {
             _toolBridge = toolBridge ?? throw new ArgumentNullException(nameof(toolBridge));
+            _ctx = ctx;
         }
 
         /// <summary>
@@ -47,6 +50,8 @@ namespace NativeMcp.Editor.Protocol
 
             try
             {
+                ct.ThrowIfCancellationRequested();
+
                 JToken result;
                 switch (request.Method)
                 {
@@ -81,6 +86,12 @@ namespace NativeMcp.Editor.Protocol
             }
             catch (OperationCanceledException)
             {
+                var reason = _ctx?.CancelReason;
+                if (reason != null)
+                {
+                    var data = JToken.FromObject(new { reason });
+                    return SerializeError(request.Id, JsonRpcErrorCodes.DomainReloadCancelled, "Request cancelled", data);
+                }
                 return SerializeError(request.Id, JsonRpcErrorCodes.InternalError, "Request cancelled");
             }
             catch (Exception ex)
