@@ -6,15 +6,17 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Resources;
+using NativeMcp.Editor.Services;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 
 namespace NativeMcp.Editor.Tools
 {
     /// <summary>
-    /// Holds information about a registered command handler.
+    /// Holds information about a registered resource handler.
     /// </summary>
-    class HandlerInfo
+    class ResourceHandlerInfo
     {
         public string CommandName { get; }
         public Func<JObject, object> SyncHandler { get; }
@@ -22,7 +24,7 @@ namespace NativeMcp.Editor.Tools
 
         public bool IsAsync => AsyncHandler != null;
 
-        public HandlerInfo(string commandName, Func<JObject, object> syncHandler, Func<JObject, Task<object>> asyncHandler)
+        public ResourceHandlerInfo(string commandName, Func<JObject, object> syncHandler, Func<JObject, Task<object>> asyncHandler)
         {
             CommandName = commandName;
             SyncHandler = syncHandler;
@@ -31,118 +33,182 @@ namespace NativeMcp.Editor.Tools
     }
 
     /// <summary>
-    /// Registry for all MCP command handlers via reflection.
-    /// Handles both MCP tools and resources.
+    /// Registry for all MCP command handlers.
+    /// Tool handlers are looked up from <see cref="IToolDiscoveryService"/>.
+    /// Resource handlers are discovered separately via reflection.
     /// </summary>
     public static class CommandRegistry
     {
-        private static readonly Dictionary<string, HandlerInfo> _handlers = new();
+        private static readonly Dictionary<string, ResourceHandlerInfo> _resourceHandlers = new();
+        private static IToolDiscoveryService _discovery;
         private static bool _initialized = false;
 
         /// <summary>
-        /// Initialize and auto-discover all tools and resources marked with
-        /// [McpForUnityTool] or [McpForUnityResource]
+        /// Initialize with a tool discovery service and auto-discover resources.
         /// </summary>
-        public static void Initialize()
+        public static void Initialize(IToolDiscoveryService discovery)
         {
             if (_initialized) return;
 
-            AutoDiscoverCommands();
+            _discovery = discovery ?? throw new ArgumentNullException(nameof(discovery));
+
+            // Ensure tools are discovered (this also binds handler delegates)
+            _discovery.DiscoverAllTools();
+
+            // Discover resources separately
+            DiscoverResources();
+
             _initialized = true;
         }
 
         /// <summary>
-        /// Convert PascalCase or camelCase to snake_case
+        /// Get a synchronous command handler by name.
+        /// Throws if the command is asynchronous.
         /// </summary>
-        private static string ToSnakeCase(string name)
+        public static Func<JObject, object> GetHandler(string commandName)
         {
-            if (string.IsNullOrEmpty(name)) return name;
+            // Try tool first
+            var tool = _discovery?.GetToolMetadata(commandName);
+            if (tool != null)
+            {
+                if (tool.IsAsync)
+                {
+                    throw new InvalidOperationException(
+                        $"Command '{commandName}' is asynchronous and must be executed via ExecuteCommand"
+                    );
+                }
+                if (tool.SyncHandler == null)
+                {
+                    throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
+                }
+                return tool.SyncHandler;
+            }
 
-            // Insert underscore before uppercase letters (except first)
-            var s1 = Regex.Replace(name, "(.)([A-Z][a-z]+)", "$1_$2");
-            var s2 = Regex.Replace(s1, "([a-z0-9])([A-Z])", "$1_$2");
-            return s2.ToLower();
+            // Try resource
+            var resource = GetResourceHandler(commandName);
+            if (resource.IsAsync)
+            {
+                throw new InvalidOperationException(
+                    $"Command '{commandName}' is asynchronous and must be executed via ExecuteCommand"
+                );
+            }
+            return resource.SyncHandler;
         }
 
         /// <summary>
-        /// Auto-discover all types with [McpForUnityTool] or [McpForUnityResource] attributes
+        /// Execute a command handler, supporting both synchronous and asynchronous handlers.
         /// </summary>
-        private static void AutoDiscoverCommands()
+        public static object ExecuteCommand(string commandName, JObject @params, TaskCompletionSource<string> tcs)
+        {
+            // Try tool first
+            var tool = _discovery?.GetToolMetadata(commandName);
+            if (tool != null && (tool.SyncHandler != null || tool.AsyncHandler != null))
+            {
+                if (tool.IsAsync)
+                {
+                    ExecuteAsyncHandler(tool.AsyncHandler, @params, commandName, tcs);
+                    return null;
+                }
+                if (tool.SyncHandler == null)
+                {
+                    throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
+                }
+                return tool.SyncHandler(@params);
+            }
+
+            // Try resource
+            var resource = GetResourceHandler(commandName);
+            if (resource.IsAsync)
+            {
+                ExecuteAsyncHandler(resource.AsyncHandler, @params, commandName, tcs);
+                return null;
+            }
+            if (resource.SyncHandler == null)
+            {
+                throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
+            }
+            return resource.SyncHandler(@params);
+        }
+
+        /// <summary>
+        /// Execute a command handler and return its raw result, regardless of sync or async implementation.
+        /// </summary>
+        public static Task<object> InvokeCommandAsync(string commandName, JObject @params)
+        {
+            var payload = @params ?? new JObject();
+
+            // Try tool first
+            var tool = _discovery?.GetToolMetadata(commandName);
+            if (tool != null && (tool.SyncHandler != null || tool.AsyncHandler != null))
+            {
+                if (tool.IsAsync)
+                {
+                    if (tool.AsyncHandler == null)
+                        throw new InvalidOperationException($"Async handler for '{commandName}' is not configured correctly");
+                    return tool.AsyncHandler(payload);
+                }
+                if (tool.SyncHandler == null)
+                    throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
+                return Task.FromResult(tool.SyncHandler(payload));
+            }
+
+            // Try resource
+            var resource = GetResourceHandler(commandName);
+            if (resource.IsAsync)
+            {
+                if (resource.AsyncHandler == null)
+                    throw new InvalidOperationException($"Async handler for '{commandName}' is not configured correctly");
+                return resource.AsyncHandler(payload);
+            }
+            if (resource.SyncHandler == null)
+                throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
+            return Task.FromResult(resource.SyncHandler(payload));
+        }
+
+        private static ResourceHandlerInfo GetResourceHandler(string commandName)
+        {
+            if (!_resourceHandlers.TryGetValue(commandName, out var handler))
+            {
+                throw new InvalidOperationException(
+                    $"Unknown or unsupported command type: {commandName}"
+                );
+            }
+            return handler;
+        }
+
+        /// <summary>
+        /// Discover resource handlers via reflection.
+        /// </summary>
+        private static void DiscoverResources()
         {
             try
             {
-                var allTypes = AppDomain.CurrentDomain.GetAssemblies()
-                    .Where(a => !a.IsDynamic)
-                    .SelectMany(a =>
-                    {
-                        try { return a.GetTypes(); }
-                        catch { return new Type[0]; }
-                    })
-                    .ToList();
-
-                // Discover tools
-                var toolTypes = allTypes.Where(t => t.GetCustomAttribute<McpForUnityToolAttribute>() != null);
-                int toolCount = 0;
-                foreach (var type in toolTypes)
-                {
-                    if (RegisterCommandType(type, isResource: false))
-                        toolCount++;
-                }
-
-                // Discover resources
-                var resourceTypes = allTypes.Where(t => t.GetCustomAttribute<McpForUnityResourceAttribute>() != null);
+                var resourceTypes = TypeCache.GetTypesWithAttribute<McpForUnityResourceAttribute>();
                 int resourceCount = 0;
                 foreach (var type in resourceTypes)
                 {
-                    if (RegisterCommandType(type, isResource: true))
+                    if (RegisterResource(type))
                         resourceCount++;
                 }
 
-                McpLog.Info($"Auto-discovered {toolCount} tools and {resourceCount} resources ({_handlers.Count} total handlers)");
+                McpLog.Info($"Auto-discovered {resourceCount} resources via TypeCache");
             }
             catch (Exception ex)
             {
-                McpLog.Error($"Failed to auto-discover MCP commands: {ex.Message}");
+                McpLog.Error($"Failed to auto-discover MCP resources: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// Register a command type (tool or resource) with the registry.
-        /// Returns true if successfully registered, false otherwise.
-        /// </summary>
-        private static bool RegisterCommandType(Type type, bool isResource)
+        private static bool RegisterResource(Type type)
         {
-            string commandName;
-            string typeLabel = isResource ? "resource" : "tool";
+            var resourceAttr = type.GetCustomAttribute<McpForUnityResourceAttribute>();
+            string commandName = resourceAttr.ResourceName;
 
-            // Get command name from appropriate attribute
-            if (isResource)
-            {
-                var resourceAttr = type.GetCustomAttribute<McpForUnityResourceAttribute>();
-                commandName = resourceAttr.ResourceName;
-            }
-            else
-            {
-                var toolAttr = type.GetCustomAttribute<McpForUnityToolAttribute>();
-                commandName = toolAttr.CommandName;
-            }
-
-            // Auto-generate command name if not explicitly provided
             if (string.IsNullOrEmpty(commandName))
             {
-                commandName = ToSnakeCase(type.Name);
+                commandName = NamingConventions.ToSnakeCase(type.Name);
             }
 
-            // Check for duplicate command names
-            if (_handlers.ContainsKey(commandName))
-            {
-                McpLog.Warn(
-                    $"Duplicate command name '{commandName}' detected. " +
-                    $"{typeLabel} {type.Name} will override previously registered handler."
-                );
-            }
-
-            // Find HandleCommand method
             var method = type.GetMethod(
                 "HandleCommand",
                 BindingFlags.Public | BindingFlags.Static,
@@ -154,7 +220,7 @@ namespace NativeMcp.Editor.Tools
             if (method == null)
             {
                 McpLog.Warn(
-                    $"MCP {typeLabel} {type.Name} is marked with [McpForUnity{(isResource ? "Resource" : "Tool")}] " +
+                    $"MCP resource {type.Name} is marked with [McpForUnityResource] " +
                     $"but has no public static HandleCommand(JObject) method"
                 );
                 return false;
@@ -162,12 +228,12 @@ namespace NativeMcp.Editor.Tools
 
             try
             {
-                HandlerInfo handlerInfo;
+                ResourceHandlerInfo handlerInfo;
 
                 if (typeof(Task).IsAssignableFrom(method.ReturnType))
                 {
                     var asyncHandler = CreateAsyncHandlerDelegate(method, commandName);
-                    handlerInfo = new HandlerInfo(commandName, null, asyncHandler);
+                    handlerInfo = new ResourceHandlerInfo(commandName, null, asyncHandler);
                 }
                 else
                 {
@@ -175,117 +241,22 @@ namespace NativeMcp.Editor.Tools
                         typeof(Func<JObject, object>),
                         method
                     );
-                    handlerInfo = new HandlerInfo(commandName, handler, null);
+                    handlerInfo = new ResourceHandlerInfo(commandName, handler, null);
                 }
 
-                _handlers[commandName] = handlerInfo;
+                _resourceHandlers[commandName] = handlerInfo;
                 return true;
             }
             catch (Exception ex)
             {
-                McpLog.Error($"Failed to register {typeLabel} {type.Name}: {ex.Message}");
+                McpLog.Error($"Failed to register resource {type.Name}: {ex.Message}");
                 return false;
             }
         }
 
         /// <summary>
-        /// Get a command handler by name
+        /// Create a delegate for an async handler method that returns Task or Task&lt;T&gt;.
         /// </summary>
-        private static HandlerInfo GetHandlerInfo(string commandName)
-        {
-            if (!_handlers.TryGetValue(commandName, out var handler))
-            {
-                throw new InvalidOperationException(
-                    $"Unknown or unsupported command type: {commandName}"
-                );
-            }
-            return handler;
-        }
-
-        /// <summary>
-        /// Get a synchronous command handler by name.
-        /// Throws if the command is asynchronous.
-        /// </summary>
-        /// <param name="commandName"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidOperationException"></exception>
-        public static Func<JObject, object> GetHandler(string commandName)
-        {
-            var handlerInfo = GetHandlerInfo(commandName);
-            if (handlerInfo.IsAsync)
-            {
-                throw new InvalidOperationException(
-                    $"Command '{commandName}' is asynchronous and must be executed via ExecuteCommand"
-                );
-            }
-
-            return handlerInfo.SyncHandler;
-        }
-
-        /// <summary>
-        /// Execute a command handler, supporting both synchronous and asynchronous (coroutine) handlers.
-        /// If the handler returns an IEnumerator, it will be executed as a coroutine.
-        /// </summary>
-        /// <param name="commandName">The command name to execute</param>
-        /// <param name="params">Command parameters</param>
-        /// <param name="tcs">TaskCompletionSource to complete when async operation finishes</param>
-        /// <returns>The result for synchronous commands, or null for async commands (TCS will be completed later)</returns>
-        public static object ExecuteCommand(string commandName, JObject @params, TaskCompletionSource<string> tcs)
-        {
-            var handlerInfo = GetHandlerInfo(commandName);
-
-            if (handlerInfo.IsAsync)
-            {
-                ExecuteAsyncHandler(handlerInfo, @params, commandName, tcs);
-                return null;
-            }
-
-            if (handlerInfo.SyncHandler == null)
-            {
-                throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
-            }
-
-            return handlerInfo.SyncHandler(@params);
-        }
-
-        /// <summary>
-        /// Execute a command handler and return its raw result, regardless of sync or async implementation.
-        /// Used internally for features like batch execution where commands need to be composed.
-        /// </summary>
-        /// <param name="commandName">The registered command to execute.</param>
-        /// <param name="params">Parameters to pass to the command (optional).</param>
-        public static Task<object> InvokeCommandAsync(string commandName, JObject @params)
-        {
-            var handlerInfo = GetHandlerInfo(commandName);
-            var payload = @params ?? new JObject();
-
-            if (handlerInfo.IsAsync)
-            {
-                if (handlerInfo.AsyncHandler == null)
-                {
-                    throw new InvalidOperationException($"Async handler for '{commandName}' is not configured correctly");
-                }
-
-                return handlerInfo.AsyncHandler(payload);
-            }
-
-            if (handlerInfo.SyncHandler == null)
-            {
-                throw new InvalidOperationException($"Handler for '{commandName}' does not provide a synchronous implementation");
-            }
-
-            object result = handlerInfo.SyncHandler(payload);
-            return Task.FromResult(result);
-        }
-
-        /// <summary>
-        /// Create a delegate for an async handler method that returns Task or Task<T>.
-        /// The delegate will invoke the method and await its completion, returning the result.
-        /// </summary>
-        /// <param name="method"></param>
-        /// <param name="commandName"></param>
-        /// <returns></returns>
-        /// <exception cref="InvalidOperationException"></exception>
         private static Func<JObject, Task<object>> CreateAsyncHandlerDelegate(MethodInfo method, string commandName)
         {
             return async (JObject parameters) =>
@@ -330,12 +301,12 @@ namespace NativeMcp.Editor.Tools
         }
 
         private static void ExecuteAsyncHandler(
-            HandlerInfo handlerInfo,
+            Func<JObject, Task<object>> asyncHandler,
             JObject parameters,
             string commandName,
             TaskCompletionSource<string> tcs)
         {
-            if (handlerInfo.AsyncHandler == null)
+            if (asyncHandler == null)
             {
                 throw new InvalidOperationException($"Async handler for '{commandName}' is not configured correctly");
             }
@@ -344,7 +315,7 @@ namespace NativeMcp.Editor.Tools
 
             try
             {
-                handlerTask = handlerInfo.AsyncHandler(parameters);
+                handlerTask = asyncHandler(parameters);
             }
             catch (Exception ex)
             {
@@ -374,12 +345,6 @@ namespace NativeMcp.Editor.Tools
             AwaitHandler();
         }
 
-        /// <summary>
-        /// Complete the TaskCompletionSource for an async command with a success result.
-        /// </summary>
-        /// <param name="commandName"></param>
-        /// <param name="tcs"></param>
-        /// <param name="result"></param>
         private static void CompleteAsyncCommand(string commandName, TaskCompletionSource<string> tcs, object result)
         {
             try
@@ -399,13 +364,6 @@ namespace NativeMcp.Editor.Tools
             }
         }
 
-        /// <summary>
-        /// Report an error that occurred during async command execution.
-        /// Completes the TaskCompletionSource with an error response.
-        /// </summary>
-        /// <param name="commandName"></param>
-        /// <param name="tcs"></param>
-        /// <param name="ex"></param>
         private static void ReportAsyncFailure(string commandName, TaskCompletionSource<string> tcs, Exception ex)
         {
             McpLog.Error($"Error in async command '{commandName}': {ex.Message}\n{ex.StackTrace}");

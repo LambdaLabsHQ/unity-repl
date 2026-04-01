@@ -7,9 +7,38 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    internal static class GameObjectDuplicate
+    [McpForUnityTool("gameobject_duplicate", Internal = true, Description = "Duplicate a GameObject in the scene.")]
+    public static class GameObjectDuplicate
     {
-        internal static object Handle(JObject @params, JToken targetToken, string searchMethod)
+        public class Parameters
+        {
+            [ToolParameter("Target GameObject to duplicate (name, path, or instanceID)", Required = true)]
+            public object target { get; set; }
+
+            [ToolParameter("Search method: by_name, by_path, by_id, by_tag, by_layer, by_component, by_id_or_name_or_path", Required = false)]
+            public string searchMethod { get; set; }
+
+            [ToolParameter("Name for the duplicated GameObject", Required = false)]
+            public string new_name { get; set; }
+
+            [ToolParameter("World position for the duplicate as {x,y,z}", Required = false)]
+            public object position { get; set; }
+
+            [ToolParameter("Offset from the original position as {x,y,z}", Required = false)]
+            public object offset { get; set; }
+
+            [ToolParameter("Parent GameObject for the duplicate (name, path, or instanceID; null for root)", Required = false)]
+            public object parent { get; set; }
+        }
+
+        public static object HandleCommand(JObject @params)
+        {
+            JToken targetToken = @params?["target"];
+            string searchMethod = @params?["searchMethod"]?.ToString()?.ToLower();
+            return Handle(@params, targetToken, searchMethod);
+        }
+
+        public static object Handle(JObject @params, JToken targetToken, string searchMethod)
         {
             GameObject sourceGo = ManageGameObjectCommon.FindObjectInternal(targetToken, searchMethod);
             if (sourceGo == null)

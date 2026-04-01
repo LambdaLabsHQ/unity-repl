@@ -7,9 +7,41 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    internal static class GameObjectMoveRelative
+    [McpForUnityTool("gameobject_move_relative", Internal = true, Description = "Move a GameObject relative to its siblings under the same parent.")]
+    public static class GameObjectMoveRelative
     {
-        internal static object Handle(JObject @params, JToken targetToken, string searchMethod)
+        public class Parameters
+        {
+            [ToolParameter("Target GameObject to move (name, path, or instanceID)", Required = true)]
+            public object target { get; set; }
+
+            [ToolParameter("Search method: by_name, by_path, by_id, by_tag, by_layer, by_component, by_id_or_name_or_path", Required = false)]
+            public string searchMethod { get; set; }
+
+            [ToolParameter("Reference GameObject to position relative to (name, path, or instanceID)", Required = true)]
+            public object reference_object { get; set; }
+
+            [ToolParameter("Direction relative to reference: right, left, up, down, forward, back", Required = false)]
+            public string direction { get; set; }
+
+            [ToolParameter("Distance from reference object (default 1)", Required = false, DefaultValue = "1")]
+            public float distance { get; set; }
+
+            [ToolParameter("Custom offset from reference as {x,y,z}", Required = false)]
+            public object offset { get; set; }
+
+            [ToolParameter("Use world space for direction/offset (default true)", Required = false, DefaultValue = "true")]
+            public bool world_space { get; set; }
+        }
+
+        public static object HandleCommand(JObject @params)
+        {
+            JToken targetToken = @params?["target"];
+            string searchMethod = @params?["searchMethod"]?.ToString()?.ToLower();
+            return Handle(@params, targetToken, searchMethod);
+        }
+
+        public static object Handle(JObject @params, JToken targetToken, string searchMethod)
         {
             GameObject targetGo = ManageGameObjectCommon.FindObjectInternal(targetToken, searchMethod);
             if (targetGo == null)

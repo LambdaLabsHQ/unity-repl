@@ -14,7 +14,7 @@ namespace NativeMcp.Editor.Tools
     /// Explicitly refreshes Unity's asset database and optionally requests a script compilation.
     /// This is side-effectful and should be treated as a tool.
     /// </summary>
-    [McpForUnityTool("refresh_unity")]
+    [McpForUnityTool("refresh_unity", Internal = true)]
     public static class RefreshUnity
     {
         private const int DefaultWaitTimeoutSeconds = 60;

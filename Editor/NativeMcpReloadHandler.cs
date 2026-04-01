@@ -1,4 +1,5 @@
 using System;
+using NativeMcp.Editor.Helpers;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,7 +12,7 @@ namespace NativeMcp.Editor
     [InitializeOnLoad]
     internal static class NativeMcpReloadHandler
     {
-        private const string ResumeAfterReloadKey = "NativeMcp_ResumeAfterReload";
+        private const string ResumeAfterReloadKey = NativeMcpKeys.ResumeAfterReload;
         private static bool _pendingResume;
         private static int _resumeFrameDelay;
 
@@ -31,7 +32,7 @@ namespace NativeMcp.Editor
                 if (wasRunning)
                 {
                     Debug.Log("[NativeMcp] Stopping server before assembly reload...");
-                    NativeMcpServerHost.StopServer(deletePortFile: false);
+                    NativeMcpServerHost.StopServer(deletePortFile: false, reason: "domain_reload");
                 }
             }
             catch (Exception ex)

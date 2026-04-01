@@ -10,9 +10,48 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    internal static class GameObjectCreate
+    [McpForUnityTool("gameobject_create", Internal = true, Description = "Create a new GameObject in the scene.")]
+    public static class GameObjectCreate
     {
-        internal static object Handle(JObject @params)
+        public class Parameters
+        {
+            [ToolParameter("Name of the new GameObject", Required = true)]
+            public string name { get; set; }
+
+            [ToolParameter("Tag to assign to the GameObject", Required = false)]
+            public string tag { get; set; }
+
+            [ToolParameter("Primitive type to create (e.g. Cube, Sphere, Capsule, Cylinder, Plane, Quad)", Required = false)]
+            public string primitiveType { get; set; }
+
+            [ToolParameter("Parent GameObject (name, path, or instanceID)", Required = false)]
+            public string parent { get; set; }
+
+            [ToolParameter("Local position as {x,y,z}", Required = false)]
+            public object position { get; set; }
+
+            [ToolParameter("Local rotation (Euler angles) as {x,y,z}", Required = false)]
+            public object rotation { get; set; }
+
+            [ToolParameter("Local scale as {x,y,z}", Required = false)]
+            public object scale { get; set; }
+
+            [ToolParameter("Component properties to set as { ComponentType: { prop: value } }", Required = false)]
+            public object componentProperties { get; set; }
+
+            [ToolParameter("Whether to save the created object as a prefab asset", Required = false, DefaultValue = "false")]
+            public bool saveAsPrefab { get; set; }
+
+            [ToolParameter("Path for prefab instantiation or save-as-prefab destination (e.g. Assets/Prefabs/MyPrefab.prefab)", Required = false)]
+            public string prefabPath { get; set; }
+        }
+
+        public static object HandleCommand(JObject @params)
+        {
+            return Handle(@params);
+        }
+
+        public static object Handle(JObject @params)
         {
             string name = @params["name"]?.ToString();
             if (string.IsNullOrEmpty(name))

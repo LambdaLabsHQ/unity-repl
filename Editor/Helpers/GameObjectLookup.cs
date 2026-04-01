@@ -15,6 +15,14 @@ namespace NativeMcp.Editor.Helpers
     /// </summary>
     public static class GameObjectLookup
     {
+        private static bool _hasDontDestroyOnLoadSceneCache;
+        private static Scene _cachedDontDestroyOnLoadScene;
+
+        static GameObjectLookup()
+        {
+            EditorApplication.playModeStateChanged += _ => InvalidateDontDestroyOnLoadSceneCache();
+        }
+
         /// <summary>
         /// Supported search methods for finding GameObjects.
         /// </summary>
@@ -329,23 +337,7 @@ namespace NativeMcp.Editor.Helpers
         /// </summary>
         private static IEnumerable<GameObject> GetDontDestroyOnLoadObjects(bool includeInactive)
         {
-            // Create a temporary object, move to DontDestroyOnLoad, get its scene, then destroy it
-            GameObject temp = null;
-            Scene ddolScene = default;
-            try
-            {
-                temp = new GameObject("__MCP_DDOL_Probe__");
-                temp.hideFlags = HideFlags.HideAndDontSave;
-                UnityEngine.Object.DontDestroyOnLoad(temp);
-                ddolScene = temp.scene;
-            }
-            finally
-            {
-                if (temp != null)
-                    UnityEngine.Object.DestroyImmediate(temp);
-            }
-
-            if (!ddolScene.IsValid())
+            if (!TryGetDontDestroyOnLoadScene(out var ddolScene))
                 yield break;
 
             var rootObjects = ddolScene.GetRootGameObjects();
@@ -359,6 +351,55 @@ namespace NativeMcp.Editor.Helpers
                     yield return go;
                 }
             }
+        }
+
+        private static bool TryGetDontDestroyOnLoadScene(out Scene scene)
+        {
+            scene = default;
+
+            if (!Application.isPlaying)
+            {
+                InvalidateDontDestroyOnLoadSceneCache();
+                return false;
+            }
+
+            if (_hasDontDestroyOnLoadSceneCache
+                && _cachedDontDestroyOnLoadScene.IsValid()
+                && _cachedDontDestroyOnLoadScene.isLoaded)
+            {
+                scene = _cachedDontDestroyOnLoadScene;
+                return true;
+            }
+
+            GameObject temp = null;
+            try
+            {
+                temp = new GameObject("__MCP_DDOL_Probe__");
+                temp.hideFlags = HideFlags.HideAndDontSave;
+                UnityEngine.Object.DontDestroyOnLoad(temp);
+                scene = temp.scene;
+            }
+            finally
+            {
+                if (temp != null)
+                    UnityEngine.Object.DestroyImmediate(temp);
+            }
+
+            if (!scene.IsValid())
+            {
+                InvalidateDontDestroyOnLoadSceneCache();
+                return false;
+            }
+
+            _cachedDontDestroyOnLoadScene = scene;
+            _hasDontDestroyOnLoadSceneCache = true;
+            return true;
+        }
+
+        private static void InvalidateDontDestroyOnLoadSceneCache()
+        {
+            _cachedDontDestroyOnLoadScene = default;
+            _hasDontDestroyOnLoadSceneCache = false;
         }
 
         private static IEnumerable<GameObject> GetObjectAndDescendants(GameObject obj, bool includeInactive)
@@ -421,4 +462,3 @@ namespace NativeMcp.Editor.Helpers
         }
     }
 }
-

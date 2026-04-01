@@ -7,9 +7,26 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    internal static class GameObjectDelete
+    [McpForUnityTool("gameobject_delete", Internal = true, Description = "Delete one or more GameObjects from the scene.")]
+    public static class GameObjectDelete
     {
-        internal static object Handle(JToken targetToken, string searchMethod)
+        public class Parameters
+        {
+            [ToolParameter("Target GameObject(s) to delete (name, path, instanceID, or array)", Required = true)]
+            public object target { get; set; }
+
+            [ToolParameter("Search method: by_name, by_path, by_id, by_tag, by_layer, by_component, by_id_or_name_or_path", Required = false)]
+            public string searchMethod { get; set; }
+        }
+
+        public static object HandleCommand(JObject @params)
+        {
+            JToken targetToken = @params?["target"];
+            string searchMethod = @params?["searchMethod"]?.ToString()?.ToLower();
+            return Handle(targetToken, searchMethod);
+        }
+
+        public static object Handle(JToken targetToken, string searchMethod)
         {
             List<GameObject> targets = ManageGameObjectCommon.FindObjectsInternal(targetToken, searchMethod, true);
 

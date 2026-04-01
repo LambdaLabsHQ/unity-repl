@@ -82,5 +82,12 @@ namespace NativeMcp.Editor.Protocol
         public const int MethodNotFound = -32601;
         public const int InvalidParams = -32602;
         public const int InternalError = -32603;
+
+        /// <summary>
+        /// Returned when an in-flight request is cancelled due to a domain reload.
+        /// The error data includes <c>{ "reason": "domain_reload" }</c>.
+        /// Bridge clients should wait for the server to restart and retry the request.
+        /// </summary>
+        public const int DomainReloadCancelled = -32001;
     }
 }

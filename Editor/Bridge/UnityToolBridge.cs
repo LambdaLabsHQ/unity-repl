@@ -34,8 +34,9 @@ namespace NativeMcp.Editor.Bridge
         public UnityToolBridge()
         {
             _discovery = new ToolDiscoveryService();
-            // Ensure CommandRegistry is initialized
-            CommandRegistry.Initialize();
+            // Initialize CommandRegistry with the discovery service so tool handlers
+            // are resolved from ToolDiscoveryService (single scan pass).
+            CommandRegistry.Initialize(_discovery);
         }
 
         /// <summary>
@@ -46,7 +47,7 @@ namespace NativeMcp.Editor.Bridge
         {
             var result = await RunOnMainThreadAsync(() =>
             {
-                var enabledTools = _discovery.GetEnabledTools();
+                var enabledTools = _discovery.GetExposedTools();
                 var definitions = new List<McpToolDefinition>(enabledTools.Count);
 
                 foreach (var tool in enabledTools)
@@ -69,6 +70,24 @@ namespace NativeMcp.Editor.Bridge
         {
             try
             {
+                // Block external calls to internal-only tools
+                var metadata = _discovery.GetToolMetadata(toolName);
+                if (metadata != null && metadata.Internal)
+                {
+                    return new McpToolCallResult
+                    {
+                        IsError = true,
+                        Content = new List<McpContentBlock>
+                        {
+                            new McpContentBlock
+                            {
+                                Type = "text",
+                                Text = $"Tool '{toolName}' is not available. Use the corresponding meta-tool instead."
+                            }
+                        }
+                    };
+                }
+
                 // CommandRegistry.InvokeCommandAsync must run on the Unity main thread
                 // because tool handlers access Unity APIs.
                 object rawResult = await RunOnMainThreadAsync(() =>

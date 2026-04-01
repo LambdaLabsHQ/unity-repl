@@ -10,9 +10,50 @@ using UnityEngine;
 
 namespace NativeMcp.Editor.Tools.GameObjects
 {
-    internal static class GameObjectModify
+    [McpForUnityTool("gameobject_modify", Internal = true, Description = "Modify properties of an existing GameObject (name, tag, layer, transform, parent, active state).")]
+    public static class GameObjectModify
     {
-        internal static object Handle(JObject @params, JToken targetToken, string searchMethod)
+        public class Parameters
+        {
+            [ToolParameter("Target GameObject to modify (name, path, or instanceID)", Required = true)]
+            public object target { get; set; }
+
+            [ToolParameter("Search method: by_name, by_path, by_id, by_tag, by_layer, by_component, by_id_or_name_or_path", Required = false)]
+            public string searchMethod { get; set; }
+
+            [ToolParameter("New name for the GameObject", Required = false)]
+            public string name { get; set; }
+
+            [ToolParameter("Tag to assign", Required = false)]
+            public string tag { get; set; }
+
+            [ToolParameter("Layer name to assign", Required = false)]
+            public string layer { get; set; }
+
+            [ToolParameter("New parent GameObject (name, path, or instanceID; null to unparent)", Required = false)]
+            public object parent { get; set; }
+
+            [ToolParameter("Local position as {x,y,z}", Required = false)]
+            public object position { get; set; }
+
+            [ToolParameter("Local rotation (Euler angles) as {x,y,z}", Required = false)]
+            public object rotation { get; set; }
+
+            [ToolParameter("Local scale as {x,y,z}", Required = false)]
+            public object scale { get; set; }
+
+            [ToolParameter("Set the GameObject active or inactive", Required = false)]
+            public bool? setActive { get; set; }
+        }
+
+        public static object HandleCommand(JObject @params)
+        {
+            JToken targetToken = @params?["target"];
+            string searchMethod = @params?["searchMethod"]?.ToString()?.ToLower();
+            return Handle(@params, targetToken, searchMethod);
+        }
+
+        public static object Handle(JObject @params, JToken targetToken, string searchMethod)
         {
             // When setActive=true is specified, we need to search for inactive objects
             // otherwise we can't find an inactive object to activate it

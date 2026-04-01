@@ -18,7 +18,7 @@ namespace NativeMcp.Editor.Transport
     internal class HttpListenerTransport : IDisposable
     {
         private HttpListener _listener;
-        private CancellationTokenSource _cts;
+        private McpCancellationContext _ctx;
         private readonly McpProtocolHandler _protocolHandler;
         private readonly McpSessionManager _sessionManager;
         private readonly int _port;
@@ -30,12 +30,14 @@ namespace NativeMcp.Editor.Transport
         public string Url => $"http://localhost:{_port}{_endpoint}";
 
         public HttpListenerTransport(McpProtocolHandler protocolHandler,
-            McpSessionManager sessionManager, int port = 8090, string endpoint = "/mcp")
+            McpSessionManager sessionManager, int port = 8090, string endpoint = "/mcp",
+            McpCancellationContext ctx = null)
         {
             _protocolHandler = protocolHandler ?? throw new ArgumentNullException(nameof(protocolHandler));
             _sessionManager = sessionManager ?? throw new ArgumentNullException(nameof(sessionManager));
             _port = port;
             _endpoint = endpoint;
+            _ctx = ctx;
         }
 
         /// <summary>
@@ -50,7 +52,7 @@ namespace NativeMcp.Editor.Transport
 
             try
             {
-                _cts = new CancellationTokenSource();
+                _ctx ??= new McpCancellationContext();
                 _listener = new HttpListener();
 
                 // HttpListener prefix must end with /
@@ -62,7 +64,7 @@ namespace NativeMcp.Editor.Transport
                 Debug.Log($"[NativeMcp] Server started on {Url}");
 
                 // Start the accept loop on a background thread
-                Task.Run(() => AcceptLoopAsync(_cts.Token), _cts.Token);
+                Task.Run(() => AcceptLoopAsync(_ctx.Token), _ctx.Token);
             }
             catch (HttpListenerException ex)
             {
@@ -75,7 +77,11 @@ namespace NativeMcp.Editor.Transport
         /// <summary>
         /// Stop listening and clean up resources.
         /// </summary>
-        public void Stop()
+        /// <param name="reason">
+        /// Optional reason for stopping. Pass "domain_reload" when stopping due to an assembly
+        /// reload so that in-flight requests can signal clients to wait and retry.
+        /// </param>
+        public void Stop(string reason = null)
         {
             if (!_running)
             {
@@ -86,7 +92,7 @@ namespace NativeMcp.Editor.Transport
 
             try
             {
-                _cts?.Cancel();
+                _ctx?.Cancel(reason);
             }
             catch (ObjectDisposedException) { }
 
@@ -98,8 +104,8 @@ namespace NativeMcp.Editor.Transport
             catch (ObjectDisposedException) { }
 
             _listener = null;
-            _cts?.Dispose();
-            _cts = null;
+            _ctx?.Dispose();
+            _ctx = null;
 
             _sessionManager.ClearAll();
             Debug.Log("[NativeMcp] Server stopped");
@@ -107,7 +113,7 @@ namespace NativeMcp.Editor.Transport
 
         public void Dispose()
         {
-            Stop();
+            Stop(reason: null);
         }
 
         private async Task AcceptLoopAsync(CancellationToken ct)

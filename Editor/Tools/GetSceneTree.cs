@@ -28,7 +28,7 @@ namespace NativeMcp.Editor.Tools
     ///   - includePath     : include full hierarchy path per node (default true)
     ///   - includeTransform: include local transform data (default false)
     /// </summary>
-    [McpForUnityTool("get_scene_tree", Description =
+    [McpForUnityTool("get_scene_tree", Internal = true, Description =
         "Returns the full in-memory scene hierarchy as a compact tree. " +
         "Each node contains: name (n), instanceID (id), path (p), active (a), " +
         "components (c), and children (ch). Use instanceID with invoke_dynamic " +
@@ -83,7 +83,7 @@ namespace NativeMcp.Editor.Tools
 
                 // ── Resolve target scene(s) ──────────────────────────────
                 var prefabStage = PrefabStageUtility.GetCurrentPrefabStage();
-                var scenesToQuery = new List<(Scene scene, string label)>();
+                var scenesToQuery = new List<(UnityEngine.SceneManagement.Scene scene, string label)>();
                 string primarySceneName;
 
                 if (prefabStage != null)
