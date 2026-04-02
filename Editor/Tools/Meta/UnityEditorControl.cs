@@ -12,6 +12,9 @@ namespace NativeMcp.Editor.Tools.Meta
             "- play() — enter play mode\n" +
             "- stop() — exit play mode\n" +
             "- pause() — toggle pause in play mode\n" +
+            "- step_frame() — advance exactly one frame while paused in play mode\n" +
+            "- play_for_frames(frames, timeout?) — play for N frames then pause. Supports domain reload recovery\n" +
+            "- set_update_frequency(time_scale?, capture_framerate?) — get/set game update frequency. No args = getter\n" +
             "- add_tag(tagName) — add a project tag\n" +
             "- remove_tag(tagName) — remove a project tag\n" +
             "- add_layer(layerName) — add a project layer\n" +
@@ -25,6 +28,9 @@ namespace NativeMcp.Editor.Tools.Meta
             ["play"] = "editor_play",
             ["stop"] = "editor_stop",
             ["pause"] = "editor_pause",
+            ["step_frame"] = "editor_step_frame",
+            ["play_for_frames"] = "editor_play_for_frames",
+            ["set_update_frequency"] = "editor_set_update_frequency",
             ["add_tag"] = "editor_add_tag",
             ["remove_tag"] = "editor_remove_tag",
             ["add_layer"] = "editor_add_layer",
@@ -35,8 +41,20 @@ namespace NativeMcp.Editor.Tools.Meta
 
         public class Parameters
         {
-            [ToolParameter("Action to perform: play, stop, pause, add_tag, remove_tag, add_layer, remove_layer, set_active_tool, refresh")]
+            [ToolParameter("Action to perform: play, stop, pause, step_frame, play_for_frames, set_update_frequency, add_tag, remove_tag, add_layer, remove_layer, set_active_tool, refresh")]
             public string action { get; set; }
+
+            [ToolParameter("Number of frames to advance for play_for_frames (>= 1)", Required = false)]
+            public int? frames { get; set; }
+
+            [ToolParameter("Timeout in seconds for play_for_frames (default 30)", Required = false)]
+            public int? timeout { get; set; }
+
+            [ToolParameter("Time scale for set_update_frequency (0=frozen, 1=normal, range [0,100])", Required = false)]
+            public float? time_scale { get; set; }
+
+            [ToolParameter("Capture framerate for deterministic mode (0=off). deltaTime = timeScale/captureFramerate", Required = false)]
+            public int? capture_framerate { get; set; }
 
             [ToolParameter("Tag name for add_tag/remove_tag actions", Required = false)]
             public string tagName { get; set; }

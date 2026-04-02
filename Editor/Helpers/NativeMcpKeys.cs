@@ -7,6 +7,7 @@ namespace NativeMcp.Editor.Helpers
     {
         // SessionState keys (per-session, lost on editor restart)
         public const string PendingTestRun = "NativeMcp_PendingTestRun";
+        public const string PendingPlayForFrames = "NativeMcp_PendingPlayForFrames";
         public const string LastPort = "NativeMcp_LastPort";
 
         // EditorPrefs keys (persistent across sessions)
