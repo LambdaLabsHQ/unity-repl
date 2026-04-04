@@ -90,19 +90,22 @@ For years, integrating AI agents with game engines meant building bridges: defin
 
 We abandoned rigid MCP JSON-RPC servers. We obsoleted the restrictive Bash CLI wrappers that once claimed to replace them. We stripped away every translation layer. 
 
-### The Core Paradigm: Tokens = Execution
+### Why Pure REPL is Superior to MCP
 
-- **Omniscient Access:** The entire Unity API, runtime memory space, live scene graph, and Editor context are fully exposed. No remote bridging required.
-- **Zero-Friction Mutation:** When an agent formulates an idea, it doesn't search for an API endpoint or construct a JSON payload. It writes native C#. 
-- **The Death of Predefined Tooling:** We eliminated all JSON serialization overhead, bridging layers, and mapped endpoints. The compiler *is* the API.
+1. **Zero Schema Overhead:** MCP servers suffocate context windows with hundreds of lines of rigid JSON schemas that AI agents must memorize and parse. Unity REPL requires zero schema mapping—its schema is the C# language itself.
+2. **Eradication of the Engineering Bottleneck:** In MCP, every time an agent needs a new capability, a human developer must write a new backend endpoint, compile it, and restart the server bridge. Unity REPL allows the agent to self-serve any capability immediately by just evaluating C#.
+3. **No Serialization Loss:** There is no need to serialize deeply nested Unity Object graphs into JSON datasets merely to pipe them into LLM context. You query the exact properties you need sequentially using native C# syntax.
 
-### Pure REPL: A Step Beyond Chrome MCP
+### Why Pure REPL is Superior to CLI Wrappers
 
-While leading architectures like Chrome DevTools MCP introduced powerful raw JS `evaluate` capabilities, they fundamentally remained hybrid models. They continued to force AI agents to navigate between rigid wrapped tools (e.g., `navigate()`, `click()`) and a secondary Javascript sandbox. 
+1. **Elimination of Parse/Match Logic:** CLI wrappers (like `unity-cli inspect --object=Player`) force developers to write brittle string-argument parsers. With REPL, the agent types `GameObject.Find("Player")`. The Unity Editor's C# compiler executes the tokens natively with zero interpretation loss.
+2. **Persistent Memory State:** Standard CLI commands invoke, load, execute, and die—losing state between calls. Our File IPC seamlessly taps into the *currently running* Unity Editor Main Thread without any spin-up cost, context dropping, or Editor reloading.
 
-Unity REPL commits fully to **Pure Meta-Language Interaction**. By discarding all predefined MCP wrappers, it achieves unparalleled architectural superiority:
+### A Step Beyond Chrome MCP
 
-- **Minimal Token Overhead:** There are zero heavy JSON tool schemas or API instructions to parse.
+While leading architectures like Chrome DevTools MCP introduced powerful raw JS `evaluate` capabilities, they fundamentally remained hybrid models. They continued to force AI agents to navigate between rigid wrapped tools (e.g., `navigate()`, `click()`) and a secondary JavaScript sandbox. 
+
+Unity REPL commits fully to **Pure Meta-Language Interaction**. 
 - **Absolute Directness:** No API bridging or translation layers. The Unity C# compiler executes your tokens natively.
 - **Infinite Extensibility (Self-Authoring Tools):** You never wait for an engineer to expose an MCP tool. The AI can dynamically solidify complex multi-line REPL operations into permanent C# scripts and execute them directly later (e.g. `ExecuteMacro("build_scene.cs")`). The agent builds its own self-expanding toolbelt sequentially, with zero recompilation.
 - **Cognitive Consistency:** The AI's reasoning loop is entirely unified in C#, eliminating decision hesitation over "which tool to use".
