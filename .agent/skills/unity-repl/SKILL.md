@@ -1,11 +1,17 @@
 ---
-name: unity-cli
-description: 通过 UnityREPL 与 Unity Editor 进行进程间通信。支持持久化 stdin/stdout 流，用 C# 风格的调用语法直接在 Unity 主线程中运行逻辑，响应为纯文本。
+name: unity-repl
+description: Meta-language abstraction for Unity. REPL is the ultimate evolution of Agent tooling, replacing rigid schemas with an omniscient, unrestricted native C# interface. Tokens map directly to execution.
 ---
 
 # UnityREPL
 
-UnityREPL 是一个持久化的 C# REPL，通过文件 IPC 直接在 Unity Editor 主线程上执行任意 C# 代码。原有的 repl JSON-RPC 封装已被移除，现在必须直接执行原生的 C# 语句。
+> **REPL is the ultimate evolution of AI agent tooling. Meta-language abstraction is the highest form of tool calling.**
+
+UnityREPL abandons both the bloated frameworks of rigid MCP servers and the restrictive Bash CLI wrappers that once claimed to replace them. Instead of forcing AI agents to guess available functions from a predetermined menu of CLI arguments or MCP endpoints, it exposes the meta-language itself.
+
+**Tokens map directly to execution.**
+
+Operating via a persistent file-system IPC, UnityREPL compiles and evaluates your native C# outputs directly on the Unity Editor's Main Thread. This profound architectural shift grants you omniscient, infinite control. When formulating logic, you no longer decide *which* tool to invoke; instead, you directly command the engine's runtime memory, scene graph, and complete API surface. The language is your only tool.
 
 ## 启动
 
