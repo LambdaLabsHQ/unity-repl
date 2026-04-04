@@ -1,7 +1,6 @@
 # Unity REPL: The most powerful AI interface for Unity
-*(and more)*
 
-Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC. Instead of granting AI agents a pre-approved menu of CLI arguments or MCP endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
+Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC, providing an architecture that is fundamentally superior to both rigid MCP (Model Context Protocol) servers and standard CLI wrappers. Instead of granting AI agents a pre-approved menu of parsed arguments or JSON-RPC endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
 
 ## A Live Session: Infinite Control
 
