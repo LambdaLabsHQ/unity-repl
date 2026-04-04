@@ -1,17 +1,17 @@
 {
-    "name": "com.danielgame.unity-mcp-native",
+    "name": "com.lambda-labs.unity-repl",
     "version": "0.1.0",
-    "displayName": "Native MCP Server for Unity",
-    "description": "A pure C# MCP Streamable HTTP server running inside Unity Editor. Implements the MCP protocol directly via HttpListener, with built-in Unity tool handlers.",
+    "displayName": "Native repl Server for Unity",
+    "description": "A pure C# repl Streamable HTTP server running inside Unity Editor. Implements the repl protocol directly via HttpListener, with built-in Unity tool handlers.",
     "unity": "2021.3",
     "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.0.2"
     },
     "keywords": [
-        "mcp",
+        "repl",
         "ai",
         "model-context-protocol",
-        "mcp-server"
+        "repl-server"
     ],
     "author": {
         "name": "Daniel"

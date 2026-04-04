@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 
-namespace NativeMcp.Runtime
+namespace LambdaLabs.UnityRepl.Runtime
 {
     /// <summary>
-    /// Holds metadata and the handler delegate for a dynamically registered MCP tool.
+    /// Holds metadata and the handler delegate for a dynamically registered repl tool.
     /// </summary>
     public class DynamicToolInfo
     {
@@ -25,7 +25,7 @@ namespace NativeMcp.Runtime
 
         /// <summary>
         /// The handler function.  Receives a dictionary of argument name → value.
-        /// Return value will be serialized as JSON and sent back to the MCP client.
+        /// Return value will be serialized as JSON and sent back to the repl client.
         /// </summary>
         public Func<Dictionary<string, object>, object> Handler { get; set; }
 

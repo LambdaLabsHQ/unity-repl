@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEditor; // Required for AssetDatabase and EditorUtility
 #endif
 
-namespace NativeMcp.Runtime.Serialization
+namespace LambdaLabs.UnityRepl.Runtime.Serialization
 {
     public class Vector3Converter : JsonConverter<Vector3>
     {
@@ -192,7 +192,7 @@ namespace NativeMcp.Runtime.Serialization
     /// Safe converter for Matrix4x4 that only accesses raw matrix elements (m00-m33).
     /// Avoids computed properties (lossyScale, rotation, inverse) that call ValidTRS()
     /// and can crash Unity on non-TRS matrices (common in Cinemachine components).
-    /// Fixes: https://github.com/CoplayDev/unity-mcp/issues/478
+    /// Fixes: https://github.com/CoplayDev/unity-repl/issues/478
     /// </summary>
     public class Matrix4x4Converter : JsonConverter<Matrix4x4>
     {

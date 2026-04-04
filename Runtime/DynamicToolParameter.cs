@@ -1,7 +1,7 @@
-namespace NativeMcp.Runtime
+namespace LambdaLabs.UnityRepl.Runtime
 {
     /// <summary>
-    /// Describes a parameter for a dynamically registered MCP tool.
+    /// Describes a parameter for a dynamically registered repl tool.
     /// </summary>
     public class DynamicToolParameter
     {

@@ -5,7 +5,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-namespace NativeMcp.Editor.Transport
+namespace LambdaLabs.UnityRepl.Editor.Transport
 {
     /// <summary>
     /// C# REPL evaluator using Mono.CSharp.Evaluator (loaded via reflection).

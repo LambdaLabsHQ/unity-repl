@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
-namespace NativeMcp.Runtime.Helpers
+namespace LambdaLabs.UnityRepl.Runtime.Helpers
 //The reason for having another Runtime Utilities in additional to Editor Utilities is to avoid Editor-only dependencies in this runtime code.
 {
     public readonly struct ScreenshotCaptureResult

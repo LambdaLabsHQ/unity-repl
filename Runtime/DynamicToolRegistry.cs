@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 
-namespace NativeMcp.Runtime
+namespace LambdaLabs.UnityRepl.Runtime
 {
     /// <summary>
-    /// Static registry for dynamically registered MCP tools.
+    /// Static registry for dynamically registered repl tools.
     /// Game code can register/unregister functions at runtime, making them
-    /// callable by AI via the <c>invoke_dynamic</c> MCP tool.
+    /// callable by AI via the <c>invoke_dynamic</c> repl tool.
     ///
     /// This class lives in the Runtime assembly so both Editor and game
     /// assemblies can reference it without circular dependencies.
@@ -53,7 +53,7 @@ namespace NativeMcp.Runtime
         // ────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Register a function as a dynamic MCP tool.
+        /// Register a function as a dynamic repl tool.
         /// </summary>
         /// <param name="name">Unique tool name (snake_case recommended).</param>
         /// <param name="description">Description shown to the LLM.</param>
@@ -90,7 +90,7 @@ namespace NativeMcp.Runtime
         }
 
         /// <summary>
-        /// Register a method on a target object as a dynamic MCP tool.
+        /// Register a method on a target object as a dynamic repl tool.
         /// Uses reflection to invoke the method. Supports both parameterless
         /// methods and methods that accept a <c>Dictionary&lt;string, object&gt;</c>.
         /// </summary>

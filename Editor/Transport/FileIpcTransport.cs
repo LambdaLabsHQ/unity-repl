@@ -3,7 +3,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace NativeMcp.Editor.Transport
+namespace LambdaLabs.UnityRepl.Editor.Transport
 {
     /// <summary>
     /// UnityREPL file-based IPC transport.
@@ -22,7 +22,7 @@ namespace NativeMcp.Editor.Transport
         public FileIpcTransport()
         {
             var projectRoot = Directory.GetParent(Application.dataPath).FullName;
-            var ipcDir = Path.Combine(projectRoot, "Temp", "UnityMcpIpc");
+            var ipcDir = Path.Combine(projectRoot, "Temp", "UnityReplIpc");
             _reqDir = Path.Combine(ipcDir, "Requests");
             _resDir = Path.Combine(ipcDir, "Responses");
         }
