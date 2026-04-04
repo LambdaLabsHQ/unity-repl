@@ -5,6 +5,7 @@ using NativeMcp.Editor.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace NativeMcp.Editor.Tools.Scene
 {
@@ -84,6 +85,17 @@ namespace NativeMcp.Editor.Tools.Scene
                 {
                     nodes = activeScene.GetRootGameObjects().Where(go => go != null).ToList();
                     scope = "roots";
+
+                    // Include DontDestroyOnLoad root objects in Play Mode
+                    if (Application.isPlaying
+                        && GameObjectLookup.TryGetDontDestroyOnLoadScene(out var ddolScene))
+                    {
+                        foreach (var root in ddolScene.GetRootGameObjects())
+                        {
+                            if (root != null && root.name != "__MCP_DDOL_Probe__")
+                                nodes.Add(root);
+                        }
+                    }
                 }
                 else
                 {

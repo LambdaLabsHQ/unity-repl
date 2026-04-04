@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Services;
 using NativeMcp.Editor.Tools;
 using NativeMcp.Editor.Protocol;
@@ -251,7 +252,8 @@ namespace NativeMcp.Editor.Bridge
                 // Serialize the result object to JSON
                 try
                 {
-                    text = JsonConvert.SerializeObject(rawResult, Formatting.Indented);
+                    text = JsonConvert.SerializeObject(rawResult, Formatting.Indented,
+                        UnityJsonSerializer.Settings);
 
                     // Check if the result contains an error status
                     if (rawResult is JObject jObj)

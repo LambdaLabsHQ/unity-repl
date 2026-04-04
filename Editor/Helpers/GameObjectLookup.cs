@@ -335,7 +335,7 @@ namespace NativeMcp.Editor.Helpers
         /// Gets all GameObjects in the DontDestroyOnLoad scene.
         /// Uses a temporary helper object to discover the hidden scene.
         /// </summary>
-        private static IEnumerable<GameObject> GetDontDestroyOnLoadObjects(bool includeInactive)
+        internal static IEnumerable<GameObject> GetDontDestroyOnLoadObjects(bool includeInactive)
         {
             if (!TryGetDontDestroyOnLoadScene(out var ddolScene))
                 yield break;
@@ -353,7 +353,7 @@ namespace NativeMcp.Editor.Helpers
             }
         }
 
-        private static bool TryGetDontDestroyOnLoadScene(out Scene scene)
+        internal static bool TryGetDontDestroyOnLoadScene(out Scene scene)
         {
             scene = default;
 

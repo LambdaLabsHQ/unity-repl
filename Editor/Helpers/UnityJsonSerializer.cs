@@ -11,10 +11,10 @@ namespace NativeMcp.Editor.Helpers
     public static class UnityJsonSerializer
     {
         /// <summary>
-        /// Shared JsonSerializer instance with converters for Unity types.
-        /// Use this for all JToken-to-Unity-type conversions.
+        /// Shared serializer settings with converters for Unity types.
+        /// Use with JsonConvert.SerializeObject for consistent Unity type serialization.
         /// </summary>
-        public static readonly JsonSerializer Instance = JsonSerializer.Create(new JsonSerializerSettings
+        public static readonly JsonSerializerSettings Settings = new JsonSerializerSettings
         {
             Converters = new List<JsonConverter>
             {
@@ -25,9 +25,16 @@ namespace NativeMcp.Editor.Helpers
                 new ColorConverter(),
                 new RectConverter(),
                 new BoundsConverter(),
+                new Matrix4x4Converter(),
                 new UnityEngineObjectConverter()
             }
-        });
+        };
+
+        /// <summary>
+        /// Shared JsonSerializer instance with converters for Unity types.
+        /// Use this for all JToken-to-Unity-type conversions.
+        /// </summary>
+        public static readonly JsonSerializer Instance = JsonSerializer.Create(Settings);
     }
 }
 

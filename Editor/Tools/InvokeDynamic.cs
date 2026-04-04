@@ -5,6 +5,7 @@ using System.Reflection;
 using NativeMcp.Editor.Helpers;
 using NativeMcp.Runtime;
 using Newtonsoft.Json.Linq;
+using UnityEditor;
 using UnityEngine;
 
 namespace NativeMcp.Editor.Tools
@@ -21,10 +22,11 @@ namespace NativeMcp.Editor.Tools
     /// </summary>
     [McpForUnityTool("invoke_dynamic", Internal = true,
         Description = "Reflect-invoke any method or access any property. Two-step workflow: " +
-                      "1) action='resolve_method' with method='Type.Member' to inspect candidates. " +
+                      "1) action='resolve_method' with method='Type.Member' to inspect candidates (use 'Type.*' to list all). " +
                       "2) action='call_method' with method='Type.ExactName' to execute. " +
                       "Supports static/instance methods, properties. " +
                       "Instance methods on MonoBehaviours are auto-located in the scene. " +
+                      "Use instance_id or game_object to target a specific instance when multiple exist. " +
                       "Also supports action='list'/'call'/'describe' for pre-registered dynamic tools.")]
     public static class InvokeDynamic
     {
@@ -53,6 +55,14 @@ namespace NativeMcp.Editor.Tools
 
             [ToolParameter("JSON object of arguments. Keys mapped to parameter names.", Required = false)]
             public string args { get; set; }
+
+            [ToolParameter("Instance ID of the target object (from get_scene_tree or get_hierarchy). " +
+                           "Targets a specific instance when multiple exist.", Required = false)]
+            public int? instance_id { get; set; }
+
+            [ToolParameter("GameObject name or hierarchy path to find the target instance on. " +
+                           "Alternative to instance_id.", Required = false)]
+            public string game_object { get; set; }
         }
 
         public static object HandleCommand(JObject @params)
@@ -112,6 +122,10 @@ namespace NativeMcp.Editor.Tools
             if (targetType == null)
                 return new ErrorResponse($"Type '{typePart}' not found. Try full name like 'Namespace.ClassName'.");
 
+            // Wildcard: "Type.*" or "Type." lists all members
+            if (memberName == "*" || memberName == "")
+                return HandleListAllMembers(targetType);
+
             var candidates = new List<object>();
 
             // Properties (case-insensitive)
@@ -163,6 +177,66 @@ namespace NativeMcp.Editor.Tools
         }
 
         // ────────────────────────────────────────────────────────────
+        //  list all members — wildcard resolve
+        // ────────────────────────────────────────────────────────────
+
+        private static object HandleListAllMembers(Type targetType)
+        {
+            const int maxProperties = 50;
+            const int maxMethods = 50;
+
+            var properties = new List<object>();
+            bool propsTruncated = false;
+
+            foreach (var p in GetPropertiesCached(targetType))
+            {
+                if (properties.Count >= maxProperties) { propsTruncated = true; break; }
+                properties.Add(new
+                {
+                    kind = "property",
+                    name = p.Name,
+                    type = p.PropertyType.Name,
+                    is_static = p.GetGetMethod(true)?.IsStatic ?? p.GetSetMethod(true)?.IsStatic ?? false,
+                    can_read = p.CanRead,
+                    can_write = p.CanWrite,
+                    call_as = $"{targetType.Name}.{p.Name}"
+                });
+            }
+
+            var methods = new List<object>();
+            bool methodsTruncated = false;
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var m in GetMethodsCached(targetType).Where(m => !m.IsSpecialName))
+            {
+                if (!seen.Add(m.Name)) continue; // skip overloads (use exact resolve to see all)
+                if (methods.Count >= maxMethods) { methodsTruncated = true; break; }
+                methods.Add(new
+                {
+                    kind = "method",
+                    name = m.Name,
+                    signature = $"{m.Name}({string.Join(", ", m.GetParameters().Select(p => $"{p.ParameterType.Name} {p.Name}"))})",
+                    return_type = m.ReturnType.Name,
+                    is_static = m.IsStatic,
+                    call_as = $"{targetType.Name}.{m.Name}"
+                });
+            }
+
+            bool truncated = propsTruncated || methodsTruncated;
+            return new SuccessResponse(
+                $"{targetType.Name}: {properties.Count} properties, {methods.Count} methods" +
+                (truncated ? " (truncated, use 'Type.Name' for specific member)" : "") +
+                ". Use action='call_method' with the exact call_as value to execute.",
+                new
+                {
+                    type = targetType.FullName,
+                    properties,
+                    methods,
+                    truncated
+                });
+        }
+
+        // ────────────────────────────────────────────────────────────
         //  call_method — exact match, execute directly
         // ────────────────────────────────────────────────────────────
 
@@ -187,6 +261,11 @@ namespace NativeMcp.Editor.Tools
             if (argDict == null)
                 return new ErrorResponse("Failed to parse 'args'.");
 
+            // Extract instance targeting params (separate from method args)
+            int? instanceId = @params["instance_id"]?.Type == JTokenType.Integer
+                ? @params["instance_id"].Value<int>() : null;
+            string gameObjectName = @params["game_object"]?.ToString();
+
             // 1) Try exact property match
             var prop = GetPropertiesCached(targetType).FirstOrDefault(p =>
                 string.Equals(p.Name, memberName, StringComparison.Ordinal));
@@ -197,7 +276,7 @@ namespace NativeMcp.Editor.Tools
                     : prop.GetGetMethod(true);
                 if (accessor == null)
                     return new ErrorResponse($"Property '{memberName}' has no {(argDict.Count > 0 ? "setter" : "getter")}.");
-                return InvokeMethod(accessor, targetType, argDict);
+                return InvokeMethod(accessor, targetType, argDict, instanceId, gameObjectName);
             }
 
             // 2) Try exact method match
@@ -213,7 +292,7 @@ namespace NativeMcp.Editor.Tools
                 return new ErrorResponse($"No matching overload. Candidates:\n{string.Join("\n", sigs)}");
             }
 
-            return InvokeMethod(method, targetType, argDict);
+            return InvokeMethod(method, targetType, argDict, instanceId, gameObjectName);
         }
 
         // ────────────────────────────────────────────────────────────
@@ -531,15 +610,73 @@ namespace NativeMcp.Editor.Tools
         }
 
         /// <summary>
-        /// Find a live instance of the given type in the scene.
+        /// Find a live instance with explicit targeting (instance_id or game_object name).
+        /// Falls back to auto-discovery when neither is specified.
+        /// </summary>
+        private static object ResolveInstance(Type type, int? instanceId, string gameObjectName)
+        {
+            // Path 1: Exact lookup by instance ID
+            if (instanceId.HasValue)
+            {
+                var obj = EditorUtility.InstanceIDToObject(instanceId.Value);
+                if (obj == null) return null;
+                if (type.IsInstanceOfType(obj)) return obj;
+                if (obj is GameObject go && typeof(Component).IsAssignableFrom(type))
+                    return go.GetComponent(type);
+                if (obj is Component comp && typeof(Component).IsAssignableFrom(type))
+                    return comp.gameObject.GetComponent(type);
+                return null;
+            }
+
+            // Path 2: Find by GameObject name or hierarchy path
+            if (!string.IsNullOrEmpty(gameObjectName))
+            {
+                var go = GameObject.Find(gameObjectName);
+                if (go == null)
+                {
+                    var ids = GameObjectLookup.SearchGameObjects("by_name", gameObjectName, true, 1);
+                    int firstId = ids.FirstOrDefault();
+                    if (firstId != 0)
+                        go = EditorUtility.InstanceIDToObject(firstId) as GameObject;
+                }
+                if (go == null) return null;
+                if (type == typeof(GameObject) || type.IsAssignableFrom(typeof(GameObject)))
+                    return go;
+                if (typeof(Component).IsAssignableFrom(type))
+                    return go.GetComponent(type);
+                return null;
+            }
+
+            // Path 3: Auto-discover (original behavior)
+            return ResolveInstance(type);
+        }
+
+        /// <summary>
+        /// Find a live instance of the given type in the scene (auto-discovery fallback).
+        /// Searches DontDestroyOnLoad objects when FindObjectOfType returns null in play mode.
         /// </summary>
         private static object ResolveInstance(Type type)
         {
-            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
-            {
+            if (!typeof(UnityEngine.Object).IsAssignableFrom(type))
+                return null;
+
 #pragma warning disable CS0618
-                return UnityEngine.Object.FindObjectOfType(type);
+            var found = UnityEngine.Object.FindObjectOfType(type);
 #pragma warning restore CS0618
+            if (found != null) return found;
+
+            // FindObjectOfType does not search the DontDestroyOnLoad scene
+            if (!Application.isPlaying) return null;
+
+            foreach (var go in GameObjectLookup.GetDontDestroyOnLoadObjects(true))
+            {
+                if (type.IsAssignableFrom(typeof(GameObject)))
+                    return go;
+                if (typeof(Component).IsAssignableFrom(type))
+                {
+                    var comp = go.GetComponent(type);
+                    if (comp != null) return comp;
+                }
             }
             return null;
         }
@@ -595,6 +732,63 @@ namespace NativeMcp.Editor.Tools
                     Convert.ToSingle(v2.GetValueOrDefault("y", 0f)));
             }
 
+            // Vector4
+            if (target == typeof(Vector4) && value is Dictionary<string, object> v4)
+            {
+                return new Vector4(
+                    Convert.ToSingle(v4.GetValueOrDefault("x", 0f)),
+                    Convert.ToSingle(v4.GetValueOrDefault("y", 0f)),
+                    Convert.ToSingle(v4.GetValueOrDefault("z", 0f)),
+                    Convert.ToSingle(v4.GetValueOrDefault("w", 0f)));
+            }
+
+            // Quaternion
+            if (target == typeof(Quaternion) && value is Dictionary<string, object> qd)
+            {
+                return new Quaternion(
+                    Convert.ToSingle(qd.GetValueOrDefault("x", 0f)),
+                    Convert.ToSingle(qd.GetValueOrDefault("y", 0f)),
+                    Convert.ToSingle(qd.GetValueOrDefault("z", 0f)),
+                    Convert.ToSingle(qd.GetValueOrDefault("w", 0f)));
+            }
+
+            // Color
+            if (target == typeof(Color) && value is Dictionary<string, object> cd)
+            {
+                return new Color(
+                    Convert.ToSingle(cd.GetValueOrDefault("r", 0f)),
+                    Convert.ToSingle(cd.GetValueOrDefault("g", 0f)),
+                    Convert.ToSingle(cd.GetValueOrDefault("b", 0f)),
+                    Convert.ToSingle(cd.GetValueOrDefault("a", 1f)));
+            }
+
+            // Rect
+            if (target == typeof(Rect) && value is Dictionary<string, object> rd)
+            {
+                return new Rect(
+                    Convert.ToSingle(rd.GetValueOrDefault("x", 0f)),
+                    Convert.ToSingle(rd.GetValueOrDefault("y", 0f)),
+                    Convert.ToSingle(rd.GetValueOrDefault("width", 0f)),
+                    Convert.ToSingle(rd.GetValueOrDefault("height", 0f)));
+            }
+
+            // Bounds
+            if (target == typeof(Bounds) && value is Dictionary<string, object> bd)
+            {
+                Vector3 center = default, size = default;
+                if (bd.TryGetValue("center", out var cv) && cv is Dictionary<string, object> cd2)
+                    center = new Vector3(
+                        Convert.ToSingle(cd2.GetValueOrDefault("x", 0f)),
+                        Convert.ToSingle(cd2.GetValueOrDefault("y", 0f)),
+                        Convert.ToSingle(cd2.GetValueOrDefault("z", 0f)));
+                if (bd.TryGetValue("size", out var sv) && sv is Dictionary<string, object> sd)
+                    size = new Vector3(
+                        Convert.ToSingle(sd.GetValueOrDefault("x", 0f)),
+                        Convert.ToSingle(sd.GetValueOrDefault("y", 0f)),
+                        Convert.ToSingle(sd.GetValueOrDefault("z", 0f)));
+                return new Bounds(center, size);
+            }
+
             // Unwrap Nullable<T> → T so Convert.ChangeType works (it cannot convert to Nullable directly)
             Type underlying = Nullable.GetUnderlyingType(target);
             if (underlying != null)
@@ -639,7 +833,8 @@ namespace NativeMcp.Editor.Tools
         /// <summary>
         /// Shared invoke: build args, resolve instance, invoke, return result.
         /// </summary>
-        private static object InvokeMethod(MethodInfo method, Type targetType, Dictionary<string, object> argDict)
+        private static object InvokeMethod(MethodInfo method, Type targetType,
+            Dictionary<string, object> argDict, int? instanceId = null, string gameObjectName = null)
         {
             var methodParams = method.GetParameters();
             object[] invokeArgs = new object[methodParams.Length];
@@ -662,9 +857,19 @@ namespace NativeMcp.Editor.Tools
             object target = null;
             if (!method.IsStatic)
             {
-                target = ResolveInstance(targetType);
+                target = ResolveInstance(targetType, instanceId, gameObjectName);
                 if (target == null)
+                {
+                    if (instanceId.HasValue)
+                        return new ErrorResponse(
+                            $"Object with instanceID {instanceId.Value} not found or does not have " +
+                            $"component '{targetType.Name}'. IDs may be stale after domain reload.");
+                    if (!string.IsNullOrEmpty(gameObjectName))
+                        return new ErrorResponse(
+                            $"GameObject '{gameObjectName}' not found or does not have " +
+                            $"component '{targetType.Name}'.");
                     return new ErrorResponse($"No instance of '{targetType.FullName}' found in scene.");
+                }
             }
 
             try

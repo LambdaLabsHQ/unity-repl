@@ -8,9 +8,10 @@ namespace NativeMcp.Editor.Tools.Meta
     [McpForUnityTool("unity_invoke",
         Description =
             "Reflect-invoke any C# method or access any property in Unity. Two-step workflow:\n" +
-            "1) action='resolve_method' with method='Type.Member' to inspect candidates.\n" +
+            "1) action='resolve_method' with method='Type.Member' to inspect candidates (use 'Type.*' to list all members).\n" +
             "2) action='call_method' with method='Type.ExactName' and args={...} to execute.\n" +
             "Supports static/instance methods and properties. Instance methods on MonoBehaviours are auto-located in the scene.\n" +
+            "Use instance_id or game_object to target a specific instance when multiple exist.\n" +
             "Also supports action='list'/'call'/'describe' for pre-registered dynamic tools.")]
     public static class UnityInvoke
     {
@@ -32,6 +33,14 @@ namespace NativeMcp.Editor.Tools.Meta
 
             [ToolParameter("JSON object of arguments. Keys mapped to parameter names.", Required = false)]
             public object args { get; set; }
+
+            [ToolParameter("Instance ID of the target object (from get_scene_tree or get_hierarchy). " +
+                           "Targets a specific instance when multiple exist.", Required = false)]
+            public int? instance_id { get; set; }
+
+            [ToolParameter("GameObject name or hierarchy path to find the target instance on. " +
+                           "Alternative to instance_id.", Required = false)]
+            public string game_object { get; set; }
         }
 
         public static object HandleCommand(JObject @params)
