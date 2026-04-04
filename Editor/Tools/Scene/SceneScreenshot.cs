@@ -366,8 +366,9 @@ namespace NativeMcp.Editor.Tools.Scene
                 gameView?.Focus();
                 return gameView;
             }
-            catch
+            catch (Exception ex)
             {
+                McpLog.Warn($"[SceneScreenshot] FocusGameView failed: {ex.Message}");
                 return null;
             }
         }

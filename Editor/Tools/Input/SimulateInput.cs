@@ -17,18 +17,41 @@ namespace NativeMcp.Editor.Tools.Input
     public static class SimulateInput
     {
         // ── Native input interception ─────────────────────────────────
-        // The real problem: each frame, NativeInputRuntime delivers hardware
-        // events that overwrite any state we injected via InputState.Change.
-        // Solution: hook NativeInputRuntime.instance.onUpdate via reflection
-        // and discard native hardware events while MCP has synthetic input active.
-        // This is the same technique Unity's own InputTestFixture uses.
+        // Each frame, NativeInputRuntime delivers hardware events that overwrite
+        // any state we injected via InputState.Change. We hook onUpdate via
+        // reflection, let hardware events through, then overwrite keyboard/mouse
+        // state with our synthetic values. Same technique as InputTestFixture.
 
         private static readonly HashSet<Key> s_heldKeys = new HashSet<Key>();
         private static readonly HashSet<int> s_heldMouseButtons = new HashSet<int>();
         private static bool s_nativeHookInstalled;
         private static Delegate s_originalOnUpdate;
+        private static MethodInfo s_originalOnUpdateMethod;
+        private static object s_originalOnUpdateTarget;
+        private static readonly object[] s_interceptorArgs = new object[2];
         private static PropertyInfo s_onUpdateProp;
         private static object s_nativeRuntimeInstance;
+
+        // ── Domain reload safety ─────────────────────────────────────
+        // Static fields survive domain reload but become stale (reflection
+        // targets point to dead instances). Reset everything so the hook
+        // is lazily re-installed on the next unity_input call.
+        [InitializeOnLoad]
+        private static class ReloadWatcher
+        {
+            static ReloadWatcher()
+            {
+                s_heldKeys.Clear();
+                s_heldMouseButtons.Clear();
+                s_nativeHookInstalled = false;
+                s_originalOnUpdate = null;
+                s_originalOnUpdateMethod = null;
+                s_originalOnUpdateTarget = null;
+                s_onUpdateProp = null;
+                s_nativeRuntimeInstance = null;
+                s_inputRouteConfigured = false;
+            }
+        }
 
         private static bool HasSyntheticInput => s_heldKeys.Count > 0 || s_heldMouseButtons.Count > 0;
 
@@ -51,7 +74,7 @@ namespace NativeMcp.Editor.Tools.Input
                     "UnityEngine.InputSystem.LowLevel.NativeInputRuntime");
                 if (nativeRuntimeType == null)
                 {
-                    Debug.LogWarning("[SimulateInput] Cannot find NativeInputRuntime type.");
+                    McpLog.Warn("[SimulateInput] Cannot find NativeInputRuntime type.");
                     return;
                 }
 
@@ -60,7 +83,7 @@ namespace NativeMcp.Editor.Tools.Input
                 s_nativeRuntimeInstance = instanceField?.GetValue(null);
                 if (s_nativeRuntimeInstance == null)
                 {
-                    Debug.LogWarning("[SimulateInput] NativeInputRuntime.instance is null.");
+                    McpLog.Warn("[SimulateInput] NativeInputRuntime.instance is null.");
                     return;
                 }
 
@@ -69,7 +92,7 @@ namespace NativeMcp.Editor.Tools.Input
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
                 if (s_onUpdateProp == null)
                 {
-                    Debug.LogWarning("[SimulateInput] Cannot find onUpdate property.");
+                    McpLog.Warn("[SimulateInput] Cannot find onUpdate property.");
                     return;
                 }
 
@@ -82,7 +105,7 @@ namespace NativeMcp.Editor.Tools.Input
                     "UnityEngine.InputSystem.LowLevel.InputUpdateDelegate");
                 if (delegateType == null)
                 {
-                    Debug.LogWarning("[SimulateInput] Cannot find InputUpdateDelegate type.");
+                    McpLog.Warn("[SimulateInput] Cannot find InputUpdateDelegate type.");
                     return;
                 }
 
@@ -92,14 +115,18 @@ namespace NativeMcp.Editor.Tools.Input
 
                 s_onUpdateProp.SetValue(s_nativeRuntimeInstance, interceptDelegate);
 
+                // Cache method/target for fast invocation in the per-frame interceptor
+                s_originalOnUpdateMethod = s_originalOnUpdate?.Method;
+                s_originalOnUpdateTarget = s_originalOnUpdate?.Target;
+
                 EditorApplication.playModeStateChanged += OnPlayModeChanged;
                 s_nativeHookInstalled = true;
 
-                Debug.Log("[SimulateInput] Native input hook installed successfully.");
+                McpLog.Info("[SimulateInput] Native input hook installed successfully.");
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[SimulateInput] Failed to install native input hook: {ex}");
+                McpLog.Error($"[SimulateInput] Failed to install native input hook: {ex}");
             }
         }
 
@@ -116,14 +143,14 @@ namespace NativeMcp.Editor.Tools.Input
             // Instead, let all events through normally, then overwrite keyboard/mouse
             // state with our synthetic values AFTER the update processes them.
 
-            // Call the original handler (triggers InputSystem.Update internally)
-            if (s_originalOnUpdate != null)
+            // Call the original handler (triggers InputSystem.Update internally).
+            // Uses cached MethodInfo/target to avoid per-frame reflection overhead.
+            if (s_originalOnUpdateMethod != null)
             {
-                var method = s_originalOnUpdate.Method;
-                var target = s_originalOnUpdate.Target;
-                var args = new object[] { updateType, eventBuffer };
-                method.Invoke(target, args);
-                eventBuffer = (InputEventBuffer)args[1];
+                s_interceptorArgs[0] = updateType;
+                s_interceptorArgs[1] = eventBuffer;
+                s_originalOnUpdateMethod.Invoke(s_originalOnUpdateTarget, s_interceptorArgs);
+                eventBuffer = (InputEventBuffer)s_interceptorArgs[1];
             }
 
             if (HasSyntheticInput)
@@ -382,18 +409,10 @@ namespace NativeMcp.Editor.Tools.Input
             // UGUI's GraphicRaycaster depends on Screen dimensions for hit testing.
             FocusGameView();
 
-            // Convert from screenshot/image coordinates (top-left origin)
-            // to InputSystem screen coordinates (bottom-left origin).
-            // Use Camera.pixelHeight which is always correct, unlike Screen.height
-            // which returns the focused Editor window's height (known Unity Editor bug).
-            if (x.HasValue || y.HasValue)
-            {
-                var cam = Camera.main;
-                if (cam != null && y.HasValue)
-                {
-                    y = cam.pixelHeight - y.Value;
-                }
-            }
+            // Convert Y from screenshot space (top-left origin) to
+            // InputSystem screen space (bottom-left origin).
+            if (y.HasValue)
+                y = ConvertScreenshotY(y.Value);
 
             using (StateEvent.From(mouse, out var eventPtr))
             {
@@ -461,6 +480,10 @@ namespace NativeMcp.Editor.Tools.Input
 
             if (x.HasValue || y.HasValue)
             {
+                FocusGameView();
+                if (y.HasValue)
+                    y = ConvertScreenshotY(y.Value);
+
                 using (StateEvent.From(mouse, out var eventPtr))
                 {
                     var currentPos = mouse.position.ReadValue();
@@ -500,7 +523,7 @@ namespace NativeMcp.Editor.Tools.Input
                             keyboard[key].WriteValueIntoEvent(0f, eventPtr);
                             released++;
                         }
-                        catch { /* Some enum values may not map to physical keys */ }
+                        catch (ArgumentException) { /* Some enum values may not map to physical keys */ }
                     }
                     InputState.Change(keyboard, eventPtr);
                 }
@@ -552,11 +575,26 @@ namespace NativeMcp.Editor.Tools.Input
             // It interferes with screenshot capture. Mouse actions call it explicitly.
         }
 
+        private static Type s_gameViewType;
+        private static Type GameViewType => s_gameViewType ??=
+            typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
+
         private static void FocusGameView()
         {
-            var gameViewType = typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView");
-            if (gameViewType != null)
-                EditorWindow.FocusWindowIfItsOpen(gameViewType);
+            if (GameViewType != null)
+                EditorWindow.FocusWindowIfItsOpen(GameViewType);
+        }
+
+        /// <summary>
+        /// Convert Y from screenshot space (top-left origin) to
+        /// InputSystem screen space (bottom-left origin).
+        /// Uses Camera.pixelHeight which is always correct, unlike Screen.height
+        /// which returns the focused Editor window's height (known Unity Editor bug).
+        /// </summary>
+        private static float ConvertScreenshotY(float y)
+        {
+            var cam = Camera.main;
+            return cam != null ? cam.pixelHeight - y : y;
         }
 
         private static void QueueKeyState(Key key, bool pressed)
