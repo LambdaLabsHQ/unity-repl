@@ -10,7 +10,6 @@ RES_DIR="$IPC_DIR/Responses"
 mkdir -p "$REQ_DIR"
 mkdir -p "$RES_DIR"
 
-SENTINEL="---END---"
 TIMEOUT_MS=60000
 
 echo "UnityREPL ready. Type C# expressions:"
@@ -54,5 +53,4 @@ while true; do
         rm -f "$RES_FILE"
         echo ""
     fi
-    echo "$SENTINEL"
 done

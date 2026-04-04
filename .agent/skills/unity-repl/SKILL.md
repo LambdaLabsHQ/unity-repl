@@ -1,43 +1,45 @@
 ---
 name: unity-repl
-description: Meta-language abstraction for Unity. REPL is the ultimate evolution of Agent tooling, replacing rigid schemas with an omniscient, unrestricted native C# interface. Tokens map directly to execution.
+description: Executes raw C# expressions and statements directly on the Unity Editor Main Thread via file-based IPC. Use this to query state, modify the scene, and execute Unity API commands with infinite control.
 ---
 
 # UnityREPL
 
-> **REPL is the ultimate evolution of AI agent tooling. Meta-language abstraction is the highest form of tool calling.**
+UnityREPL evaluates your native C# statements directly in the running Unity Editor. You command the engine's runtime memory, scene graph, and complete API surface directly without predefined tools.
 
-UnityREPL abandons both the bloated frameworks of rigid MCP servers and the restrictive Bash CLI wrappers that once claimed to replace them. Instead of forcing AI agents to guess available functions from a predetermined menu of CLI arguments or MCP endpoints, it exposes the meta-language itself.
+## Launching
 
-**Tokens map directly to execution.**
+Run directly via the system native terminal:
 
-Operating via a persistent file-system IPC, UnityREPL compiles and evaluates your native C# outputs directly on the Unity Editor's Main Thread. This profound architectural shift grants you omniscient, infinite control. When formulating logic, you no longer decide *which* tool to invoke; instead, you directly command the engine's runtime memory, scene graph, and complete API surface. The language is your only tool.
-
-## 启动
-
+**Mac / Linux**:
 ```bash
-bun run Packages/com.lambda-labs.unity-repl/ts/src/repl.ts
+./Packages/com.lambda-labs.unity-repl/repl.sh
 ```
 
-建议使用 `RunPersistent=true` 保持终端存活，然后后续通过 `send_command_input` 发送 C# 代码并检查输出。
+**Windows**:
+```cmd
+.\Packages\com.lambda-labs.unity-repl\repl.bat
+```
 
-## 基本使用
+Use `RunPersistent=true` with the `run_command` tool to keep the terminal alive, then send C# code using `send_command_input`.
 
-直接输入 C# 表达式或语句，每行（按回车执行）一个：
+## Basic Usage
+
+Directly input C# expressions or statements, one per line:
 
 ```csharp
-EditorApplication.isPlaying                              // 测试是否在运行，输出 True / False
-EditorApplication.isPlaying = true                       // 进入 Play Mode
-AssetDatabase.Refresh()                                  // 刷新资源目录
-Selection.activeGameObject?.name ?? "(none)"             // 获取当前选中物体的名字
-var go = new GameObject("Test"); go.name                 // 创建物体或执行多条语句
-SceneManager.GetActiveScene().name                       // 获取当前激活的场景名称
-GameObject.FindObjectsOfType<Camera>().Length            // 泛型查找
+EditorApplication.isPlaying                              // Test if running, outputs True / False
+EditorApplication.isPlaying = true                       // Enter Play Mode
+AssetDatabase.Refresh()                                  // Refresh Asset Database
+Selection.activeGameObject?.name ?? "(none)"             // Get the name of the active selected object
+var go = new GameObject("Test"); go.name                 // Create object or execute multiple statements
+SceneManager.GetActiveScene().name                       // Get the active scene name
+GameObject.FindObjectsOfType<Camera>().Length            // Generic searches
 ```
 
-## 预加载的命名空间
+## Preloaded Namespaces
 
-评估环境已自动预加载以下命名空间，调用时不需要完整指定。如果需要更特殊的命名空间，可以直接发送 `using Foo.Bar;`：
+The evaluation environment automatically preloads the following namespaces:
 
 ```csharp
 using UnityEngine;
@@ -50,37 +52,34 @@ using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
 ```
 
-## 响应
+## Responses
 
-如果语句有返回值（如 `1+1` 或者是求值属性 `EditorApplication.isPlaying`），将原样转成纯文本输出。
-如果抛出异常或编译报错，则返回 `ERROR` 提示并在日志中打印。
-结尾一定会有 `---END---` 标识符用来代表本次运行完成。
+- Single values or expression results are printed to stdout.
+- Exceptions or compilation errors output `ERROR` and log to the Unity Console.
 
-## 替代原有工具的方法参考库
+## Snippets & Reference
 
-现在所有的工具能力都是使用原生 C#，遇到各种场景请使用下方范例，或根据 Unity API 自行编写表达式执行：
+Do not use legacy tools. Query properties or modify systems by authoring temporary C# execution blocks.
 
-### 控制与场景
-| 功能 | 原生 C# 等价命令 |
+### Control and Scenes
+| Feature | Native C# Equivalent Command |
 |------|---------|
-| 获取当前场景名 | `SceneManager.GetActiveScene().name` |
-| 进入 Play Mode | `EditorApplication.isPlaying = true` |
-| 停止 Play Mode | `EditorApplication.isPlaying = false` |
-| 刷新/编译 | `AssetDatabase.Refresh()` |
-| 打开指定的场景 | `EditorSceneManager.OpenScene("Assets/Scenes/Lab.unity")` |
+| Get current scene | `SceneManager.GetActiveScene().name` |
+| Enter Play Mode | `EditorApplication.isPlaying = true` |
+| Stop Play Mode | `EditorApplication.isPlaying = false` |
+| Compile Assets | `AssetDatabase.Refresh()` |
+| Open scene | `EditorSceneManager.OpenScene("Assets/Scenes/Lab.unity")` |
 
-### GameObject 与 实例化
-| 功能 | 原生 C# 等价命令 |
+### GameObject and Instantiation
+| Feature | Native C# Equivalent Command |
 |------|---------|
-| 查找单个对象 | `GameObject.Find("Player") != null ? "Found" : "Missing"` |
-| 输出所有的 Camera | `string.Join(", ", GameObject.FindObjectsOfType<Camera>().Select(c => c.name))` |
-| 实例化预制体 | `var p = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Cube.prefab"); var instance = PrefabUtility.InstantiatePrefab(p) as GameObject; instance.name` |
-| 添加组件 | `var go = GameObject.Find("Player"); if(go != null) go.AddComponent<BoxCollider>();` |
+| Find object | `GameObject.Find("Player") != null ? "Found" : "Missing"` |
+| All Cameras | `string.Join(", ", GameObject.FindObjectsOfType<Camera>().Select(c => c.name))` |
+| Instantiate prefab | `var p = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Cube.prefab"); var instance = PrefabUtility.InstantiatePrefab(p) as GameObject; instance.name` |
+| Add Component | `var go = GameObject.Find("Player"); if(go != null) go.AddComponent<BoxCollider>();` |
 
-### 日志与调试
-| 功能 | 原生 C# 等价命令 |
+### Debugging and Logging
+| Feature | Native C# Equivalent Command |
 |------|---------|
-| 查看控制台错误数 | `var m = typeof(UnityEditor.LogEntries).GetMethod("GetCount", System.Reflection.BindingFlags.Static\|System.Reflection.BindingFlags.Public); m.Invoke(null,null)` |
-| 截图 | `ScreenCapture.CaptureScreenshot("/tmp/shot.png")` |
-
-> **提示给 AI**：遇到你需要的逻辑，自己临时在 REPL 中构思 C# 代码调用即可，例如查询某些类的属性，反射特定系统的状态。由于直接跑在主线程，你拥有近乎无限的访问权限。
+| Get error count | `var m = typeof(UnityEditor.LogEntries).GetMethod("GetCount", System.Reflection.BindingFlags.Static\|System.Reflection.BindingFlags.Public); m.Invoke(null,null)` |
+| Take Screenshot | `ScreenCapture.CaptureScreenshot("/tmp/shot.png")` |

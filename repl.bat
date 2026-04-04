@@ -11,7 +11,6 @@ set "RES_DIR=%IPC_DIR%\Responses"
 if not exist "%REQ_DIR%" mkdir "%REQ_DIR%"
 if not exist "%RES_DIR%" mkdir "%RES_DIR%"
 
-set "SENTINEL=---END---"
 set "TIMEOUT_MS=60000"
 
 echo UnityREPL ready. Type C# expressions:
@@ -44,7 +43,7 @@ set /a waited+=50
 
 if !waited! gtr !TIMEOUT_MS! (
     echo ERROR: timeout (60s) -- is Unity Editor running?
-    goto output_sentinel
+    goto loop
 )
 goto wait_loop
 
@@ -52,7 +51,4 @@ goto wait_loop
 type "%RES_FILE%"
 del /f /q "%RES_FILE%"
 echo.
-
-:output_sentinel
-echo %SENTINEL%
 goto loop

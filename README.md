@@ -39,10 +39,16 @@ This package embeds the persistent REPL server seamlessly into your Unity Editor
 
 1. Add this package to your Unity project.
 2. The Editor continuously listens for C# compilation requests locally.
-3. Drive the engine using the TypeScript client via any autonomous agent (or manual shell):
+3. Drive the engine using the native REPL wrapper via any autonomous agent (or manual shell):
 
+**Mac / Linux**:
 ```bash
-bun run Packages/com.lambda-labs.unity-repl/ts/src/repl.ts
+./Packages/com.lambda-labs.unity-repl/repl.sh
+```
+
+**Windows**:
+```cmd
+.\Packages\com.lambda-labs.unity-repl\repl.bat
 ```
 
 ## Welcome to Infinite Control
