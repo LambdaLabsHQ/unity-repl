@@ -1,12 +1,7 @@
 {
     "name": "NativeMcp.Editor",
     "rootNamespace": "NativeMcp.Editor",
-    "references": [
-        "NativeMcp.Runtime",
-        "Unity.InputSystem",
-        "UnityEditor.TestRunner",
-        "UnityEngine.TestRunner"
-    ],
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
