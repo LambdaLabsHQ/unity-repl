@@ -2,18 +2,36 @@
 
 Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC. Instead of granting AI agents a pre-approved menu of CLI arguments or MCP endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
 
-## Welcome to Infinite Control
+## A Live Session: Infinite Control
 
-You no longer call brittle `GetState()` or `SpawnObject()` macros. You command the universe dynamically:
+How deep does the control go? Here is a raw transcript of an Agent dynamically probing and mutating a highly complex Unity state without any pre-configured tools:
 
-```csharp
-// Evaluate states instantly
-EditorApplication.isPlaying = true;
-
-// Mutate and probe with absolute freedom
-var components = GameObject.FindObjectsOfType<Camera>();
-string.Join(", ", components.Select(c => c.name));
+```text
+UnityREPL ready. Type C# expressions:
+> EditorApplication.isPlaying = true;
+ 
+> SceneManager.GetActiveScene().name
+MainMenu
+ 
+> // Agent: "I need to spawn a testing unit to verify the turrets."
+> var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Enemies/Blender.prefab");
+> var obj = PrefabUtility.InstantiatePrefab(prefab) as GameObject;
+> obj.transform.position
+(0.00, 0.00, 0.00)
+ 
+> // Agent: "Let's teleport it into the kill zone and check physical state."
+> obj.transform.position = new Vector3(10, 0, 5);
+> obj.GetComponent<NetworkTransform>() != null
+True
+ 
+> // Agent: "I'll fetch all live active turrets and log their target distances."
+> var turrets = GameObject.FindObjectsOfType<Turret>();
+> string.Join("\n", turrets.Select(t => $"{t.name}: {Vector3.Distance(t.transform.position, obj.transform.position)}m"));
+LaserTurret_1: 12.5m
+GrenadeTurret_2: 8.2m
 ```
+
+You didn't need developers to hardcode a `SpawnEnemy()` or `GetTurretDistances()` endpoint for you today. You just wrote the C# and it executed on the Main Thread.
 
 ### Native Asynchronous Execution
 
