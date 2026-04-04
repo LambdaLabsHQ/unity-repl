@@ -20,7 +20,8 @@ namespace NativeMcp.Editor.Tools.Meta
             "- add_layer(layerName) — add a project layer\n" +
             "- remove_layer(layerName) — remove a project layer\n" +
             "- set_active_tool(toolName) — set editor tool (View, Move, Rotate, Scale, Rect, Transform)\n" +
-            "- refresh(mode?, scope?, compile?, wait_for_ready?) — refresh asset database")]
+            "- refresh(mode?, scope?, compile?, wait_for_ready?) — refresh asset database\n" +
+            "- execute_menu_item(menu_path) — execute any editor menu item by path")]
     public static class UnityEditorControl
     {
         private static readonly Dictionary<string, string> ActionMap = new()
@@ -37,11 +38,13 @@ namespace NativeMcp.Editor.Tools.Meta
             ["remove_layer"] = "editor_remove_layer",
             ["set_active_tool"] = "editor_set_active_tool",
             ["refresh"] = "refresh_unity",
+            ["execute_menu_item"] = "execute_menu_item",
         };
 
         public class Parameters
         {
-            [ToolParameter("Action to perform: play, stop, pause, step_frame, play_for_frames, set_update_frequency, add_tag, remove_tag, add_layer, remove_layer, set_active_tool, refresh")]
+            [ToolParameter("Action to perform: play, stop, pause, step_frame, play_for_frames, set_update_frequency, " +
+                           "add_tag, remove_tag, add_layer, remove_layer, set_active_tool, refresh, execute_menu_item")]
             public string action { get; set; }
 
             [ToolParameter("Number of frames to advance for play_for_frames (>= 1)", Required = false)]
@@ -76,6 +79,9 @@ namespace NativeMcp.Editor.Tools.Meta
 
             [ToolParameter("Wait for Unity ready state after refresh", Required = false)]
             public bool? wait_for_ready { get; set; }
+
+            [ToolParameter("Menu item path for execute_menu_item (e.g. 'GameObject/3D Object/Cube')", Required = false)]
+            public string menu_path { get; set; }
         }
 
         public static async Task<object> HandleCommand(JObject @params)

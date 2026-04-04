@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using NativeMcp.Editor.Helpers;
 using NativeMcp.Editor.Tools.Scene;
 using Newtonsoft.Json.Linq;
@@ -49,8 +50,7 @@ namespace NativeMcp.Editor.Tools
             try
             {
                 var task = CommandRegistry.InvokeCommandAsync(toolName, forwarded);
-                // All scene tools are synchronous, so the task is already completed.
-                return task.Result;
+                return task.GetAwaiter().GetResult();
             }
             catch (AggregateException ae) when (ae.InnerException != null)
             {
@@ -66,9 +66,9 @@ namespace NativeMcp.Editor.Tools
         /// Public API for screenshot capture. Delegates to SceneScreenshot.
         /// Kept for backward compatibility.
         /// </summary>
-        public static object ExecuteScreenshot(string fileName = null, int? superSize = null)
+        public static Task<object> ExecuteScreenshot(string fileName = null, int? superSize = null)
         {
-            return SceneScreenshot.CaptureScreenshot(fileName, superSize);
+            return SceneScreenshot.CaptureScreenshotAsync(fileName, superSize);
         }
     }
 }

@@ -52,7 +52,9 @@ namespace NativeMcp.Editor.Helpers
                 "by_component" => SearchMethod.ByComponent,
                 "by_path" => SearchMethod.ByPath,
                 "by_id" => SearchMethod.ById,
-                _ => SearchMethod.ByName
+                _ => throw new ArgumentException(
+                    $"Unknown search method '{method}'. " +
+                    "Valid: by_name, by_tag, by_layer, by_component, by_path, by_id.")
             };
         }
 

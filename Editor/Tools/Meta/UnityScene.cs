@@ -17,7 +17,7 @@ namespace NativeMcp.Editor.Tools.Meta
               "— paged hierarchy listing\n" +
             "- get_active() — active scene info\n" +
             "- get_build_settings() — scenes in Build Settings\n" +
-            "- screenshot(fileName?, superSize?) — capture camera view as image")]
+            "- screenshot(fileName?, superSize?, mode?) — capture Game View as image (mode: auto/game_view/window/camera)")]
     public static class UnityScene
     {
         private static readonly Dictionary<string, string> ActionMap = new()
@@ -85,6 +85,9 @@ namespace NativeMcp.Editor.Tools.Meta
 
             [ToolParameter("Screenshot supersampling multiplier", Required = false)]
             public int? superSize { get; set; }
+
+            [ToolParameter("Screenshot capture mode: auto (default), game_view, window, camera", Required = false)]
+            public string mode { get; set; }
         }
 
         public static async Task<object> HandleCommand(JObject @params)
