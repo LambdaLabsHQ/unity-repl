@@ -95,9 +95,17 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                 "using System.Collections.Generic;",
                 "using UnityEditor.SceneManagement;",
                 "using UnityEngine.SceneManagement;",
+                "using LambdaLabs.UnityRepl.Editor.Helpers;",
             };
             foreach (var u in usings)
-                _run.Invoke(_evaluator, new object[] { u });
+            {
+                try { _run.Invoke(_evaluator, new object[] { u }); }
+                catch { /* Tolerate optional namespaces (e.g., InputSystem may not be installed) */ }
+            }
+
+            // InputSystem.Key is behind an optional package; add separately.
+            try { _run.Invoke(_evaluator, new object[] { "using UnityEngine.InputSystem;" }); }
+            catch { }
 
             _ready = true;
             Debug.Log($"[UnityREPL] Evaluator ready ({asm.Location})");

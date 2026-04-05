@@ -1,7 +1,9 @@
 {
     "name": "LambdaLabs.UnityRepl.Editor",
     "rootNamespace": "LambdaLabs.UnityRepl.Editor",
-    "references": [],
+    "references": [
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [
         "Editor"
     ],
@@ -11,6 +13,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "UNITY_REPL_HAS_INPUT_SYSTEM"
+        }
+    ],
     "noEngineReferences": false
 }
