@@ -233,9 +233,8 @@ run_interactive() {
 }
 
 if [ "$ANY_FLAG" = 1 ]; then
-    if [ ! -t 0 ] && [ "$SRC_KIND" != stdin ]; then
-        echo "WARNING: stdin ignored because a flag was provided" >&2
-    fi
+    # When both a flag and piped stdin are present, the flag wins and stdin is
+    # silently ignored (matches `python -c 'x' < file.py` / `node -e 'x' < file.js`).
     run_oneshot
 elif [ ! -t 0 ]; then
     SRC_KIND=stdin

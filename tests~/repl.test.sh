@@ -126,8 +126,8 @@ else
     FAIL=$((FAIL+1))
 fi
 
-# 10. flag + piped stdin → warning on stderr, flag wins
-assert_case "10. flag+stdin warning" 0 "x" "stdin ignored" \
+# 10. flag + piped stdin → flag wins, stdin silently ignored (python/node parity)
+assert_case "10. flag+stdin, flag wins silently" 0 "x" "" \
     bash -c "echo ignored | bash '$REPL' -e '__ok__x'"
 
 # 11. unknown flag → exit 3
