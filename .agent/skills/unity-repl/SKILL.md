@@ -82,6 +82,71 @@ using UnityEngine.InputSystem;   // only if com.unity.inputsystem is installed
   - timeout → exit 4
 - In both modes, exceptions are additionally logged to the Unity Console.
 
+## Multi-Step Scenarios (Coroutines)
+
+When an eval expression returns an `IEnumerator`, the REPL **auto-drives it across frames** and writes the final yielded value as the response. This lets you orchestrate multi-step gameplay sequences — hold keys, wait, release, screenshot — in one REPL call.
+
+### Pattern
+
+Wrap the coroutine in a `public static class` (Mono.CSharp doesn't accept top-level method declarations). Use `System.Collections.IEnumerator` fully qualified to disambiguate from `System.Collections.Generic.IEnumerator<T>`.
+
+```csharp
+// Step 1: define the coroutine (persists until domain reload)
+public static class Demo {
+    public static System.Collections.IEnumerator CountDown() {
+        Debug.Log("3");
+        yield return new WaitForSeconds(1);
+        Debug.Log("2");
+        yield return new WaitForSeconds(1);
+        Debug.Log("1");
+        yield return "done";
+    }
+}
+
+// Step 2: invoke. Return value is IEnumerator → REPL pumps it until completion.
+// The .res response arrives after the coroutine finishes (~2s here) with "done".
+Demo.CountDown()
+```
+
+Ship both steps as one file via `repl.sh -f scenario.cs` — the last expression is the invocation, and the whole file evaluates as a single unit.
+
+### Supported yield instructions
+
+| Value yielded | Edit Mode | Play Mode |
+|---|---|---|
+| `null`, scalars, strings | advances one tick (value becomes `LastValue`) | advances one tick |
+| `WaitForSeconds` / `WaitForSecondsRealtime` | waits wall-clock seconds | native Unity scheduler |
+| `CustomYieldInstruction` | polls `.keepWaiting` | native |
+| `AsyncOperation` | polls `.isDone` | native |
+| nested `IEnumerator` | driven recursively | native |
+| `WaitForEndOfFrame`, `WaitForFixedUpdate`, `WWW`, `Task<T>` | ❌ advances one tick | ✅ native |
+
+### Response values
+
+- **Last yielded non-null value** becomes the `.res` response.
+- `(ok)` if nothing was yielded.
+- `TIMEOUT` if the coroutine exceeds the per-request timeout (default 60s).
+- `CANCELLED` if a `.cancel` file is dropped (or Ctrl-C from `repl.sh`).
+- `RUNTIME ERROR: ...` if the coroutine throws.
+- `RELOAD` if Unity domain reloads mid-flight.
+- `BUSY: queue full` if more than 8 coroutines are queued.
+
+### Timeout override
+
+First-line directive inside the file:
+```csharp
+//!timeout=30s
+public static class Slow { public static System.Collections.IEnumerator Go() { ... } }
+Slow.Go()
+```
+Also accepts `//!timeout=2m` or `//!timeout=5000` (bare ms). Align client `--timeout` / `TIMEOUT_S` env var to match.
+
+### Pitfalls
+
+- **Domain reload wipes defined classes.** Entering/exiting Play Mode triggers a reload — any `public static class Foo {}` you defined needs to be re-sent. Keep coroutine definitions in a `.cs` file and replay via `repl.sh -f` after reload.
+- **`yield` at top level is illegal** (Mono.CSharp doesn't support local functions). Always wrap: `public static class X { public static System.Collections.IEnumerator Y() { ... } }`.
+- **Top-level method declarations fail** with `CS1525: Unexpected symbol '('` even when prefixed with modifiers. The wrapper class is required.
+
 ## Snippets & Reference
 
 Do not use legacy tools. Query properties or modify systems by authoring temporary C# execution blocks.
