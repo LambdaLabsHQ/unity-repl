@@ -2,15 +2,18 @@ using System;
 using System.Collections;
 using UnityEngine;
 
-namespace LambdaLabs.UnityRepl.Editor.Transport
+namespace LambdaLabs.UnityRepl.Runtime.Transport
 {
     /// <summary>
     /// Hidden MonoBehaviour that runs user coroutines via Unity's native scheduler
     /// while Play Mode is active. Supports WaitForEndOfFrame, WaitForFixedUpdate, etc.
+    ///
+    /// Lives in the Runtime assembly (not Editor) because Unity refuses to
+    /// AddComponent Editor-only MonoBehaviours to a GameObject at runtime.
     /// </summary>
-    internal class ReplCoroutineHost : MonoBehaviour
+    public class ReplCoroutineHost : MonoBehaviour
     {
-        internal class Tracker
+        public class Tracker
         {
             public IEnumerator Inner;
             public object LastValue;

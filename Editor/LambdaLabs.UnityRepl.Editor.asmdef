@@ -2,6 +2,7 @@
     "name": "LambdaLabs.UnityRepl.Editor",
     "rootNamespace": "LambdaLabs.UnityRepl.Editor",
     "references": [
+        "LambdaLabs.UnityRepl.Runtime",
         "Unity.InputSystem"
     ],
     "includePlatforms": [
