@@ -3,6 +3,13 @@ setlocal enabledelayedexpansion
 
 :: Unity REPL Batch Client
 :: Pure IPC client. Zero external dependencies.
+::
+:: Env vars:
+::   TIMEOUT_S  -- how long to wait for a .res file before giving up (default 60)
+::
+:: To cancel a running coroutine, create an empty file:
+::   Temp\UnityReplIpc\Requests\<uuid>.cancel
+:: Ctrl-C terminates the client (no automatic cancel file on Windows).
 
 set "IPC_DIR=%CD%\Temp\UnityReplIpc"
 set "REQ_DIR=%IPC_DIR%\Requests"
@@ -11,7 +18,8 @@ set "RES_DIR=%IPC_DIR%\Responses"
 if not exist "%REQ_DIR%" mkdir "%REQ_DIR%"
 if not exist "%RES_DIR%" mkdir "%RES_DIR%"
 
-set "TIMEOUT_MS=60000"
+if "%TIMEOUT_S%"=="" set "TIMEOUT_S=60"
+set /a TIMEOUT_MS=%TIMEOUT_S% * 1000
 
 echo UnityREPL ready. Type C# expressions:
 
@@ -42,7 +50,7 @@ powershell -nop -c "Start-Sleep -Milliseconds 50"
 set /a waited+=50
 
 if !waited! gtr !TIMEOUT_MS! (
-    echo ERROR: timeout (60s) -- is Unity Editor running?
+    echo ERROR: timeout ^(%TIMEOUT_S%s^) -- is Unity Editor running?
     goto loop
 )
 goto wait_loop
