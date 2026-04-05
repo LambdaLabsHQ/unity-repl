@@ -10,6 +10,10 @@ setlocal enabledelayedexpansion
 ::
 :: Rule: any argument puts repl.bat in non-interactive mode.
 :: (cmd.exe TTY detection is unreliable, so we use an explicit flag check.)
+::
+:: To cancel a running coroutine, create an empty file:
+::   Temp\UnityReplIpc\Requests\<uuid>.cancel
+:: Ctrl-C terminates the client (no automatic cancel file on Windows).
 
 set "IPC_DIR=%CD%\Temp\UnityReplIpc"
 set "REQ_DIR=%IPC_DIR%\Requests"
@@ -186,7 +190,7 @@ if exist "%RES_FILE%" goto iread_res
 powershell -nop -c "Start-Sleep -Milliseconds 50"
 set /a waited+=50
 if !waited! gtr !TIMEOUT_MS! (
-    echo ERROR: timeout (60s) -- is Unity Editor running?
+    echo ERROR: timeout ^(%TIMEOUT_S%s^) -- is Unity Editor running?
     goto loop
 )
 goto iwait_loop
