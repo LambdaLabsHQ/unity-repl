@@ -98,10 +98,25 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                 typeof(string), typeof(object).MakeByRefType(), typeof(bool).MakeByRefType()
             });
 
-            // Reference all loaded assemblies
+            // Reference loaded assemblies, skipping those Mono.CSharp.Evaluator already
+            // pre-references internally. Adding mscorlib/System/System.Core/etc. a second
+            // time triggers CS1685 ("predefined type ... defined multiple times") warnings
+            // for System.Collections.IEnumerator, NotSupportedException, LINQ operators, etc.
+            // Dedupe by simple name to also tolerate multi-version loading edge cases.
             var refAsm = evaluatorType.GetMethod("ReferenceAssembly", new[] { typeof(Assembly) });
+            var skipAsmNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "mscorlib", "System", "System.Core", "System.Xml", "System.Xml.Linq",
+                "System.Runtime", "System.Numerics", "System.Data", "System.Drawing",
+                "netstandard", "Mono.CSharp",
+            };
+            var addedAsmNames = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var a in AppDomain.CurrentDomain.GetAssemblies())
             {
+                if (a.IsDynamic) continue;
+                var name = a.GetName().Name;
+                if (skipAsmNames.Contains(name)) continue;
+                if (!addedAsmNames.Add(name)) continue;
                 try { refAsm.Invoke(_evaluator, new object[] { a }); } catch { }
             }
 
@@ -136,10 +151,17 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                 var args = new object[] { code, null, false };
                 string partial = (string)_evaluate.Invoke(_evaluator, args);
 
-                // Check for compiler errors
-                string errors = _errorWriter.ToString().Trim();
-                if (!string.IsNullOrEmpty(errors))
-                    return EvalOutcome.Value($"COMPILE ERROR:\n{errors}");
+                // Check for compiler errors. Mono.CSharp emits both errors AND warnings
+                // to the same printer, so distinguish them: only "error CS####" lines
+                // should fail the eval. Warning-only output is logged to Unity console
+                // and the eval continues normally.
+                string diagnostics = _errorWriter.ToString().Trim();
+                if (!string.IsNullOrEmpty(diagnostics))
+                {
+                    if (HasCompileErrors(diagnostics))
+                        return EvalOutcome.Value($"COMPILE ERROR:\n{diagnostics}");
+                    Debug.LogWarning($"[UnityREPL] Compile warnings:\n{diagnostics}");
+                }
 
                 if (partial != null)
                 {
@@ -156,9 +178,13 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                         var rinner = rex.InnerException;
                         return EvalOutcome.Value($"RUNTIME ERROR: {rinner?.Message ?? rex.Message}\n{rinner?.StackTrace ?? rex.StackTrace}");
                     }
-                    string runErrors = _errorWriter.ToString().Trim();
-                    if (!string.IsNullOrEmpty(runErrors))
-                        return EvalOutcome.Value($"COMPILE ERROR:\n{runErrors}");
+                    string runDiagnostics = _errorWriter.ToString().Trim();
+                    if (!string.IsNullOrEmpty(runDiagnostics))
+                    {
+                        if (HasCompileErrors(runDiagnostics))
+                            return EvalOutcome.Value($"COMPILE ERROR:\n{runDiagnostics}");
+                        Debug.LogWarning($"[UnityREPL] Compile warnings:\n{runDiagnostics}");
+                    }
                     if (!ranOk)
                         return EvalOutcome.Value($"INCOMPLETE: {partial}");
                     return EvalOutcome.Value("(ok)");
@@ -185,6 +211,26 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
             {
                 return EvalOutcome.Value($"ERROR: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// True if any line of Mono.CSharp diagnostic output looks like a real error
+        /// (as opposed to a warning). Mono's format is either
+        ///   <c>(line,col): error CS####: ...</c> or
+        ///   <c>(line,col): warning CS####: ...</c> (location may be omitted).
+        /// We scan for ": error " / leading "error " — warning-only output returns false.
+        /// </summary>
+        private static bool HasCompileErrors(string diagnostics)
+        {
+            if (string.IsNullOrEmpty(diagnostics)) return false;
+            foreach (var rawLine in diagnostics.Split('\n'))
+            {
+                var line = rawLine.TrimStart();
+                if (line.Length == 0) continue;
+                if (line.StartsWith("error ", StringComparison.Ordinal)) return true;
+                if (line.IndexOf(": error ", StringComparison.Ordinal) >= 0) return true;
+            }
+            return false;
         }
     }
 }
