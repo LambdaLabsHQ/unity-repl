@@ -9,7 +9,7 @@ UnityREPL evaluates your native C# statements directly in the running Unity Edit
 
 ## Launching
 
-Run directly via the system native terminal:
+### Interactive (REPL prompt)
 
 **Mac / Linux**:
 ```bash
@@ -22,6 +22,25 @@ Run directly via the system native terminal:
 ```
 
 Use `RunPersistent=true` with the `run_command` tool to keep the terminal alive, then send C# code using `send_command_input`.
+
+### One-shot (preferred for scripted / agent use)
+
+For single invocations, skip the persistent session and call the REPL like `python -c` / `node -e`:
+
+```bash
+./repl.sh -e 'GameObject.FindObjectsOfType<Camera>().Length'
+./repl.sh -p 'SceneManager.GetActiveScene().name'      # -p alias, Node-style
+./repl.sh -f snippet.cs                                # evaluate a file
+echo 'AssetDatabase.Refresh()' | ./repl.sh             # piped stdin (auto-detected)
+./repl.sh -                                            # explicit stdin
+./repl.sh --timeout 10 -e '...'                        # override 60s default
+```
+
+No quoting gymnastics, no persistent session, no manual file IPC. Prefer `-f` for multi-line C# — it avoids shell-escape headaches entirely.
+
+**Output contract (one-shot mode):** success → stdout, errors → stderr. Exit codes: `0` success, `1` runtime error, `2` compile error (or incomplete expression), `3` usage/IO error, `4` timeout. No `> ` prefix, no banner.
+
+On Windows, **any argument** to `repl.bat` triggers one-shot mode (cmd.exe TTY detection is unreliable).
 
 ## Basic Usage
 
@@ -54,8 +73,12 @@ using UnityEngine.SceneManagement;
 
 ## Responses
 
-- Single values or expression results are printed to stdout.
-- Exceptions or compilation errors output `ERROR` and log to the Unity Console.
+- **Interactive mode:** results and errors all print to stdout (prefixed by the prompt on subsequent lines).
+- **One-shot mode:** success values go to **stdout**, errors go to **stderr** with exit-code classification:
+  - `COMPILE ERROR:` / `INCOMPLETE:` → exit 2
+  - `RUNTIME ERROR:` / generic `ERROR:` → exit 1
+  - timeout → exit 4
+- In both modes, exceptions are additionally logged to the Unity Console.
 
 ## Snippets & Reference
 
