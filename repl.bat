@@ -186,7 +186,7 @@ if exist "%RES_FILE%" goto iread_res
 powershell -nop -c "Start-Sleep -Milliseconds 50"
 set /a waited+=50
 if !waited! gtr !TIMEOUT_MS! (
-    echo ERROR: timeout (60s) -- is Unity Editor running?
+    echo ERROR: timeout ^(%TIMEOUT_S%s^) -- is Unity Editor running?
     goto loop
 )
 goto iwait_loop

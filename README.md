@@ -35,31 +35,50 @@ You didn't need developers to hardcode a `SpawnEnemy()` or `GetTurretDistances()
 
 ### Native Asynchronous Execution
 
-In conventional JSON-RPC or MCP tool architectures, waiting for a scene to load or an animation to finish requires creating complex internal state machines, or forcing the AI to spam polling requests via intervals. 
+In conventional JSON-RPC or MCP tool architectures, waiting for a scene to load or an animation to finish requires creating complex internal state machines, or forcing the AI to spam polling requests via intervals.
 
-**With Pure REPL, asynchronous execution is solved at the language level.**
-
-By wrapping self-authored scripts into Unity's generic `EditorCoroutine` or utilizing modern `async/await` syntax, agents can script and solidify complex time-dependent sequences synchronously in token logic, without freezing the Unity Editor's main thread:
+**With Pure REPL, asynchronous execution is solved at the language level.** When a REPL expression returns an `IEnumerator`, the server drives it across frames and writes the final yielded value as the response. You write idiomatic Unity coroutines; the `.res` file simply arrives later.
 
 ```csharp
-using Unity.EditorCoroutines.Editor;
-
+// Call 1 — define the helper (persists in the session)
 IEnumerator ComplexSetup() {
     EditorSceneManager.OpenScene("Assets/Scenes/TestScene.unity");
-    yield return null; // Wait for frame cycle
-    
+    yield return null;                      // one editor tick
     var go = new GameObject("TestEnemy");
-    yield return new WaitForSeconds(2.0f); // Yield dynamically
-    
+    yield return new WaitForSeconds(2.0f);  // delay across real seconds
     go.GetComponent<Health>().Damage(10);
-    Debug.Log("Pipeline Finished!");
+    yield return "done";                    // last yielded value → .res response
 }
 
-// Dispatch directly
-EditorCoroutineUtility.StartCoroutine(ComplexSetup(), this);
+// Call 2 — invoke it; .res arrives ~2 seconds later with value "done"
+ComplexSetup()
 ```
 
-There is no need to write API-level queues or RPC timeout configurations. The meta-language handles it natively.
+**Supported yield instructions:**
+
+| Value yielded | Edit Mode | Play Mode |
+|---|---|---|
+| `null`, scalars, strings | advance next tick (value becomes `LastValue`) | advance next tick |
+| `WaitForSeconds` / `WaitForSecondsRealtime` | waits wall-clock `seconds` | native Unity scheduler |
+| `CustomYieldInstruction` | polls `.keepWaiting` | native |
+| `AsyncOperation` | polls `.isDone` | native |
+| nested `IEnumerator` | driven to completion, then outer resumes | native |
+| `WaitForEndOfFrame`, `WaitForFixedUpdate`, `WWW`, `Task<T>` | ❌ advances one tick (use Play Mode) | ✅ native |
+
+**Response contract:**
+
+- Last yielded value (via `.ToString()`) — or `(ok)` if no value was yielded.
+- `TIMEOUT` if the coroutine exceeds its timeout.
+- `CANCELLED` if a `.cancel` file is dropped for its UUID.
+- `RUNTIME ERROR: …` if the coroutine throws.
+- `RELOAD` if the Unity domain reloads mid-flight (e.g. you save a `.cs` file).
+- `BUSY: queue full` if more than 8 coroutines are already queued.
+
+**Timeout and cancellation:**
+
+- Default per-request timeout is **60 seconds**. Override per call with a first-line directive: `//!timeout=30s`, `//!timeout=2m`, or `//!timeout=5000` (bare ms).
+- Set the client env var `TIMEOUT_S` to extend how long `repl.sh`/`repl.bat` wait for `.res` (align with your `//!timeout=`).
+- Drop an empty file at `Temp/UnityReplIpc/Requests/{uuid}.cancel` to abort a running coroutine. `repl.sh` does this automatically on the first `Ctrl-C` (a second `Ctrl-C` hard-exits the client).
 
 ## Quickstart
 

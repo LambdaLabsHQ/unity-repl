@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -7,6 +8,25 @@ using UnityEngine;
 
 namespace LambdaLabs.UnityRepl.Editor.Transport
 {
+    internal enum EvalOutcomeKind { Value, Coroutine }
+
+    internal readonly struct EvalOutcome
+    {
+        public readonly EvalOutcomeKind Kind;
+        public readonly string Text;
+        public readonly IEnumerator Coroutine;
+
+        private EvalOutcome(EvalOutcomeKind kind, string text, IEnumerator coroutine)
+        {
+            Kind = kind;
+            Text = text;
+            Coroutine = coroutine;
+        }
+
+        public static EvalOutcome Value(string text) => new EvalOutcome(EvalOutcomeKind.Value, text, null);
+        public static EvalOutcome FromCoroutine(IEnumerator co) => new EvalOutcome(EvalOutcomeKind.Coroutine, null, co);
+    }
+
     /// <summary>
     /// C# REPL evaluator using Mono.CSharp.Evaluator (loaded via reflection).
     /// Captures compiler errors via a StringWriter-based ReportPrinter.
@@ -118,10 +138,10 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
             Debug.Log($"[UnityREPL] Evaluator ready ({asm.Location})");
         }
 
-        public string Eval(string code)
+        public EvalOutcome Eval(string code)
         {
             if (!_ready)
-                return $"ERROR: evaluator not initialized\n{_initError}";
+                return EvalOutcome.Value($"ERROR: evaluator not initialized\n{_initError}");
 
             // Clear previous errors
             _errorWriter.GetStringBuilder().Clear();
@@ -139,7 +159,7 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                 if (!string.IsNullOrEmpty(diagnostics))
                 {
                     if (HasCompileErrors(diagnostics))
-                        return $"COMPILE ERROR:\n{diagnostics}";
+                        return EvalOutcome.Value($"COMPILE ERROR:\n{diagnostics}");
                     Debug.LogWarning($"[UnityREPL] Compile warnings:\n{diagnostics}");
                 }
 
@@ -156,36 +176,40 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                     catch (TargetInvocationException rex)
                     {
                         var rinner = rex.InnerException;
-                        return $"RUNTIME ERROR: {rinner?.Message ?? rex.Message}\n{rinner?.StackTrace ?? rex.StackTrace}";
+                        return EvalOutcome.Value($"RUNTIME ERROR: {rinner?.Message ?? rex.Message}\n{rinner?.StackTrace ?? rex.StackTrace}");
                     }
                     string runDiagnostics = _errorWriter.ToString().Trim();
                     if (!string.IsNullOrEmpty(runDiagnostics))
                     {
                         if (HasCompileErrors(runDiagnostics))
-                            return $"COMPILE ERROR:\n{runDiagnostics}";
+                            return EvalOutcome.Value($"COMPILE ERROR:\n{runDiagnostics}");
                         Debug.LogWarning($"[UnityREPL] Compile warnings:\n{runDiagnostics}");
                     }
                     if (!ranOk)
-                        return $"INCOMPLETE: {partial}";
-                    return "(ok)";
+                        return EvalOutcome.Value($"INCOMPLETE: {partial}");
+                    return EvalOutcome.Value("(ok)");
                 }
 
                 bool resultSet = (bool)args[2];
                 object result = args[1];
 
                 if (resultSet)
-                    return result?.ToString() ?? "(null)";
+                {
+                    if (result is IEnumerator ienum)
+                        return EvalOutcome.FromCoroutine(ienum);
+                    return EvalOutcome.Value(result?.ToString() ?? "(null)");
+                }
 
-                return "(ok)";
+                return EvalOutcome.Value("(ok)");
             }
             catch (TargetInvocationException ex)
             {
                 var inner = ex.InnerException;
-                return $"RUNTIME ERROR: {inner?.Message ?? ex.Message}\n{inner?.StackTrace ?? ex.StackTrace}";
+                return EvalOutcome.Value($"RUNTIME ERROR: {inner?.Message ?? ex.Message}\n{inner?.StackTrace ?? ex.StackTrace}");
             }
             catch (Exception ex)
             {
-                return $"ERROR: {ex.Message}\n{ex.StackTrace}";
+                return EvalOutcome.Value($"ERROR: {ex.Message}\n{ex.StackTrace}");
             }
         }
 
