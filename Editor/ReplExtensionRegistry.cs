@@ -21,16 +21,23 @@ namespace LambdaLabs.UnityRepl.Editor
 
         private static void FlushContextFile()
         {
-            var sb = new StringBuilder();
-            foreach (var e in s_entries)
+            try
             {
-                sb.AppendLine($"<!-- {e.PackageName} -->");
-                sb.AppendLine(e.SkillDoc);
-                sb.AppendLine();
+                var sb = new StringBuilder();
+                foreach (var e in s_entries)
+                {
+                    sb.AppendLine($"<!-- {e.PackageName} -->");
+                    sb.AppendLine(e.SkillDoc);
+                    sb.AppendLine();
+                }
+                var dir = "Temp/UnityReplIpc";
+                System.IO.Directory.CreateDirectory(dir);
+                System.IO.File.WriteAllText($"{dir}/extensions.md", sb.ToString());
             }
-            var dir = "Temp/UnityReplIpc";
-            System.IO.Directory.CreateDirectory(dir);
-            System.IO.File.WriteAllText($"{dir}/extensions.md", sb.ToString());
+            catch (System.Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[ReplExtensionRegistry] Failed to write extensions.md: {ex.Message}");
+            }
         }
 
         private sealed class ExtensionEntry
