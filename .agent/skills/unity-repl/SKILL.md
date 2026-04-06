@@ -171,3 +171,10 @@ Do not use legacy tools. Query properties or modify systems by authoring tempora
 |------|---------|
 | Get error count | `var m = typeof(UnityEditor.LogEntries).GetMethod("GetCount", System.Reflection.BindingFlags.Static\|System.Reflection.BindingFlags.Public); m.Invoke(null,null)` |
 | Take Screenshot | `ScreenCapture.CaptureScreenshot("/tmp/shot.png")` |
+
+## Installed Agent Packages
+
+If any `unity-agent-*` packages are installed in this project, their tool docs are
+available at `Temp/UnityReplIpc/extensions.md` (regenerated on every domain reload).
+
+Read them from REPL: `System.IO.File.ReadAllText("Temp/UnityReplIpc/extensions.md")`
