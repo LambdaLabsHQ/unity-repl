@@ -6,6 +6,10 @@
 # One-shot:      ./repl.sh -e 'CODE' | -p 'CODE' | -f PATH | -
 # Piped stdin:   echo 'CODE' | ./repl.sh     (auto-detected via [ ! -t 0 ])
 # Help:          ./repl.sh -h
+#
+# Ctrl-C: first press writes {uuid}.cancel so the server aborts the coroutine
+#         and writes CANCELLED to .res; client keeps waiting so you see the
+#         response. Second Ctrl-C hard-exits the client.
 
 PROJECT_ROOT=$(pwd)
 IPC_DIR="$PROJECT_ROOT/Temp/UnityReplIpc"
@@ -51,6 +55,22 @@ gen_uuid() {
     fi
 }
 
+# Ctrl-C cancel state (shared by send_and_wait + on_int trap).
+CURRENT_UUID=""
+CANCEL_SENT=0
+
+on_int() {
+    if [ -n "$CURRENT_UUID" ] && [ $CANCEL_SENT -eq 0 ]; then
+        touch "$REQ_DIR/$CURRENT_UUID.cancel" 2>/dev/null
+        CANCEL_SENT=1
+        echo ""
+        echo "(cancelling — waiting for CANCELLED response, Ctrl-C again to force-exit)"
+    else
+        exit 130
+    fi
+}
+trap on_int INT
+
 # send_and_wait CODE TIMEOUT_MS TRAILING_NEWLINE
 # Writes request via printf (NOT echo — echo mangles \n/\t/-e on some shells).
 # Sets globals: CUR_UUID, CUR_REQ_TMP, CUR_REQ_FILE, CUR_RES_FILE.
@@ -62,6 +82,8 @@ send_and_wait() {
     CUR_REQ_TMP="$REQ_DIR/$CUR_UUID.tmp"
     CUR_REQ_FILE="$REQ_DIR/$CUR_UUID.req"
     CUR_RES_FILE="$RES_DIR/$CUR_UUID.res"
+    CURRENT_UUID="$CUR_UUID"
+    CANCEL_SENT=0
 
     if [ "$trailing_nl" = 1 ]; then
         printf '%s\n' "$code" > "$CUR_REQ_TMP"
@@ -78,9 +100,11 @@ send_and_wait() {
             local timeout_s=$(( timeout_ms / 1000 ))
             echo "ERROR: timeout (${timeout_s}s) — is Unity Editor running?" >&2
             rm -f "$CUR_REQ_FILE" 2>/dev/null
+            CURRENT_UUID=""
             return 4
         fi
     done
+    CURRENT_UUID=""
     return 0
 }
 
@@ -197,7 +221,8 @@ run_oneshot() {
     esac
 
     # Scoped cleanup for this UUID (concurrent runs use different UUIDs, safe).
-    trap 'rm -f "${CUR_REQ_TMP:-}" "${CUR_REQ_FILE:-}" "${CUR_RES_FILE:-}" 2>/dev/null' EXIT INT TERM
+    # INT stays bound to on_int (set globally above) so Ctrl-C sends .cancel.
+    trap 'rm -f "${CUR_REQ_TMP:-}" "${CUR_REQ_FILE:-}" "${CUR_RES_FILE:-}" "$REQ_DIR/${CUR_UUID:-__none__}.cancel" 2>/dev/null' EXIT TERM
 
     send_and_wait "$code" "$TIMEOUT_MS" 0
     rc=$?
@@ -229,6 +254,8 @@ run_interactive() {
             rm -f "$CUR_RES_FILE"
             echo ""
         fi
+        # Clean up any cancel marker left behind (server consumed it or never saw it).
+        rm -f "$REQ_DIR/${CUR_UUID:-__none__}.cancel" 2>/dev/null
     done
 }
 
