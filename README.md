@@ -98,6 +98,43 @@ This package embeds the persistent REPL server seamlessly into your Unity Editor
 .\Packages\com.lambda-labs.unity-repl\repl.bat
 ```
 
+### Non-interactive invocation
+
+For scripts, CI pipelines, and automation, `repl.sh` / `repl.bat` also accept python/node-style flags:
+
+```bash
+# Inline expression
+./repl.sh -e 'EditorApplication.isPlaying'
+./repl.sh -p 'SceneManager.GetActiveScene().name'      # -p alias (Node-style)
+
+# Evaluate a file
+./repl.sh -f snippet.cs
+
+# Piped stdin (auto-detected — no TTY = non-interactive)
+echo 'AssetDatabase.Refresh()' | ./repl.sh
+./repl.sh < snippet.cs
+
+# Explicit stdin
+./repl.sh -
+
+# Override timeout (default 60s; also via REPL_TIMEOUT env var)
+./repl.sh --timeout 5 -e '...'
+```
+
+**Output contract:** success value goes to **stdout**, errors/diagnostics to **stderr**. No banner or `> ` prefix in non-interactive mode — output is directly machine-parseable.
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| 0    | success |
+| 1    | runtime error |
+| 2    | compile error (or incomplete expression) |
+| 3    | usage error / file I/O error |
+| 4    | timeout waiting for Unity |
+
+On Windows, **any argument** puts `repl.bat` in non-interactive mode (cmd.exe TTY detection is unreliable, so detection is via arg-presence instead of stdin piping).
+
 ## The Post-Tool AI Architecture
 
 > **REPL is the ultimate evolution of AI agent tooling. Meta-language abstraction is the highest form of tool calling.**
