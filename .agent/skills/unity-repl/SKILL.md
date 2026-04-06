@@ -181,10 +181,24 @@ Simulate input during Play Mode — useful for driving games, UI, or any code th
 |------|---------|
 | Hold key | `InputUtility.PressKey(Key.W)` |
 | Release key | `InputUtility.ReleaseKey(Key.W)` |
-| Tap key (advance frames between) | `InputUtility.PressKey(Key.Space); EditorApplication.Step(); InputUtility.ReleaseKey(Key.Space)` |
-| Click mouse button | `InputUtility.PressMouseButton("left"); EditorApplication.Step(); InputUtility.ReleaseMouseButton("left")` |
+| Tap key (trigger wasPressedThisFrame) | see coroutine pattern below |
+| Click mouse button | see coroutine pattern below |
 | Move mouse (screenshot coords) | `InputUtility.SetMousePosition(400, 800)` |
 | Release everything | `InputUtility.ClearAllInput()` |
+
+**One-frame delay:** `PressKey` / `PressMouseButton` do not apply state immediately — the first injection happens on the next `InputSystem.Update()` via `ReapplySyntheticState()`. Always `yield return null` before reading input state. This ensures `wasPressedThisFrame` works correctly for single-trigger keys (1–5 digit, F, Space, mouse buttons).
+
+**Tap / click pattern (use inside a coroutine):**
+```csharp
+InputUtility.PressKey(Key.Space);
+yield return null;  // state injected here; wasPressedThisFrame = true this frame
+InputUtility.ReleaseKey(Key.Space);
+```
+```csharp
+InputUtility.PressMouseButton("left");
+yield return null;  // leftButton.wasPressedThisFrame = true this frame
+InputUtility.ReleaseMouseButton("left");
+```
 
 **Note on mouse coords:** use top-left origin (same as you see in a screenshot). The helper Y-flips to InputSystem space and focuses Game View so UGUI raycasting works correctly.
 
@@ -197,6 +211,31 @@ Captures what the player sees, including HUD/UI overlays. Different from `Screen
 | Capture to PNG file | `GameViewCaptureUtility.CaptureGameViewWithUIToFile("my_shot")` |
 
 Files land under `Assets/Screenshots/`. Returns the Assets-relative path.
+
+### UI Toolkit (UIElements) Button Click
+Mouse position simulation does **not** reach UI Toolkit panels — they have their own event pipeline that bypasses `InputSystem` and `EventSystem` entirely. Invoke the button's `clicked` action directly via reflection instead.
+
+```csharp
+// Click a UIElements.Button held in a private field on a MonoBehaviour
+var screen = Object.FindFirstObjectByType<MyScreenComponent>();
+var btn = typeof(MyScreenComponent)
+    .GetField("_myButton", BindingFlags.NonPublic | BindingFlags.Instance)
+    .GetValue(screen) as UnityEngine.UIElements.Button;
+var action = typeof(UnityEngine.UIElements.Clickable)
+    .GetField("clicked", BindingFlags.NonPublic | BindingFlags.Instance)
+    .GetValue(btn.clickable) as System.Action;
+action?.Invoke();
+```
+
+This triggers all registered `clicked` callbacks exactly as if the user clicked the button. Works in both Edit Mode and Play Mode.
+
+**When to use which approach:**
+| UI System | How to click |
+|---|---|
+| UGUI (`UnityEngine.UI.Button`) | `button.onClick.Invoke()` |
+| UI Toolkit (`UIElements.Button`) | reflect `Clickable.clicked` Action, then `Invoke()` |
+| UGUI via mouse coords | `InputUtility.SetMousePosition` + `PressMouseButton` in coroutine |
+| UI Toolkit via mouse coords | ❌ not supported — use direct invocation above |
 
 ### DontDestroyOnLoad Access
 No utility needed — Unity's public API already covers DDOL. FishNet network-spawned objects, managers, persistent services all live in the DDOL scene.

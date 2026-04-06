@@ -1,7 +1,6 @@
 #if UNITY_REPL_HAS_INPUT_SYSTEM
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -15,11 +14,10 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
     /// Press/release state persists across frames until explicitly released.
     ///
     /// Why this utility exists (tricks not discoverable from Unity docs):
-    /// 1. <c>InputState.Change()</c> alone doesn't work — every frame, NativeInputRuntime
-    ///    delivers hardware events that overwrite injected state. We hook
-    ///    <c>NativeInputRuntime.instance.onUpdate</c> via reflection (same technique as
-    ///    Unity's <c>InputTestFixture</c>) and re-inject held keys/buttons after each
-    ///    native update.
+    /// 1. <c>InputState.Change()</c> called mid-frame gets overwritten when InputSystem
+    ///    processes the hardware event buffer that same frame. We hook
+    ///    <c>InputSystem.onAfterUpdate</c> to re-inject held keys AFTER the event buffer
+    ///    has been fully processed, ensuring hardware events can never override synthetic state.
     /// 2. Mouse coordinates use screenshot space (top-left origin). InputSystem uses
     ///    bottom-left. We Y-flip via <c>Camera.main.pixelHeight</c> because
     ///    <c>Screen.height</c> is broken in Editor Play Mode on macOS (returns the
@@ -27,7 +25,7 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
     /// 3. <c>editorInputBehaviorInPlayMode = AllDeviceInputAlwaysGoesToGameView</c>
     ///    routes input to the game regardless of which Editor panel has focus.
     /// 4. Static state is reset on domain reload via <c>[InitializeOnLoad] ReloadWatcher</c>
-    ///    since reflection hooks become stale after recompilation.
+    ///    since event hooks become stale after recompilation.
     ///
     /// Example usage from REPL:
     /// <code>
@@ -44,13 +42,7 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
 
         private static readonly HashSet<Key> s_heldKeys = new HashSet<Key>();
         private static readonly HashSet<int> s_heldMouseButtons = new HashSet<int>();
-        private static bool s_nativeHookInstalled;
-        private static Delegate s_originalOnUpdate;
-        private static MethodInfo s_originalOnUpdateMethod;
-        private static object s_originalOnUpdateTarget;
-        private static readonly object[] s_interceptorArgs = new object[2];
-        private static PropertyInfo s_onUpdateProp;
-        private static object s_nativeRuntimeInstance;
+        private static bool s_onAfterUpdateHooked;
         private static bool s_inputRouteConfigured;
         private static Type s_gameViewType;
 
@@ -69,12 +61,7 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
             {
                 s_heldKeys.Clear();
                 s_heldMouseButtons.Clear();
-                s_nativeHookInstalled = false;
-                s_originalOnUpdate = null;
-                s_originalOnUpdateMethod = null;
-                s_originalOnUpdateTarget = null;
-                s_onUpdateProp = null;
-                s_nativeRuntimeInstance = null;
+                s_onAfterUpdateHooked = false;
                 s_inputRouteConfigured = false;
             }
         }
@@ -104,7 +91,7 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
             if (mouse == null) return;
 
             EnsureInputRoutesToGameView();
-            EnsureNativeInputHook();
+            EnsureOnAfterUpdateHook();
             FocusGameView();
 
             float inputY = ConvertScreenshotY(screenshotY);
@@ -160,15 +147,26 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
             if (keyboard == null) return;
 
             EnsureInputRoutesToGameView();
-            EnsureNativeInputHook();
+            EnsureOnAfterUpdateHook();
 
-            if (pressed) s_heldKeys.Add(key);
-            else s_heldKeys.Remove(key);
-
-            using (StateEvent.From(keyboard, out var eventPtr))
+            if (pressed)
             {
-                keyboard[key].WriteValueIntoEvent(pressed ? 1f : 0f, eventPtr);
-                InputState.Change(keyboard, eventPtr);
+                s_heldKeys.Add(key);
+                // Do NOT call InputState.Change here.
+                // ReapplySyntheticState() fires on the next InputSystem.Update() call,
+                // ensuring previousStatePtr is still 0 at that point so that
+                // wasPressedThisFrame correctly returns true on the first press frame.
+            }
+            else
+            {
+                s_heldKeys.Remove(key);
+                // Must clear immediately: no hardware "key up" event will ever arrive
+                // for a synthetically-held key, so the bit would stay set indefinitely.
+                using (StateEvent.From(keyboard, out var eventPtr))
+                {
+                    keyboard[key].WriteValueIntoEvent(0f, eventPtr);
+                    InputState.Change(keyboard, eventPtr);
+                }
             }
         }
 
@@ -180,92 +178,43 @@ namespace LambdaLabs.UnityRepl.Editor.Helpers
             if (control == null) return;
 
             EnsureInputRoutesToGameView();
-            EnsureNativeInputHook();
+            EnsureOnAfterUpdateHook();
 
-            if (pressed) s_heldMouseButtons.Add(button);
-            else s_heldMouseButtons.Remove(button);
-
-            using (StateEvent.From(mouse, out var eventPtr))
+            if (pressed)
             {
-                control.WriteValueIntoEvent(pressed ? 1f : 0f, eventPtr);
-                InputState.Change(mouse, eventPtr);
+                s_heldMouseButtons.Add(button);
+                // Same reasoning as SetKeyState: defer first injection to
+                // ReapplySyntheticState() so previousStatePtr is 0 on that frame,
+                // allowing wasPressedThisFrame to correctly return true on the first press frame.
+            }
+            else
+            {
+                s_heldMouseButtons.Remove(button);
+                // Must clear immediately: no hardware button-up event will ever arrive
+                // for a synthetically-held button, so the bit would stay set indefinitely.
+                using (StateEvent.From(mouse, out var eventPtr))
+                {
+                    control.WriteValueIntoEvent(0f, eventPtr);
+                    InputState.Change(mouse, eventPtr);
+                }
             }
         }
 
-        // ── Native input hook ────────────────────────────────────────
+        // ── InputSystem.onAfterUpdate hook ───────────────────────────
+        // Fires after InputSystem.Update() has fully processed the hardware
+        // event buffer. Injecting state here ensures hardware events can't
+        // overwrite our synthetic keys on the same frame.
 
-        private static void EnsureNativeInputHook()
+        private static void EnsureOnAfterUpdateHook()
         {
-            if (s_nativeHookInstalled) return;
-
-            try
-            {
-                var isAssembly = typeof(InputSystem).Assembly;
-                var nativeRuntimeType = isAssembly.GetType(
-                    "UnityEngine.InputSystem.LowLevel.NativeInputRuntime");
-                if (nativeRuntimeType == null)
-                {
-                    Debug.LogWarning("[InputUtility] Cannot find NativeInputRuntime type.");
-                    return;
-                }
-
-                var instanceField = nativeRuntimeType.GetField("instance",
-                    BindingFlags.Public | BindingFlags.Static);
-                s_nativeRuntimeInstance = instanceField?.GetValue(null);
-                if (s_nativeRuntimeInstance == null)
-                {
-                    Debug.LogWarning("[InputUtility] NativeInputRuntime.instance is null.");
-                    return;
-                }
-
-                s_onUpdateProp = nativeRuntimeType.GetProperty("onUpdate",
-                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (s_onUpdateProp == null)
-                {
-                    Debug.LogWarning("[InputUtility] Cannot find onUpdate property.");
-                    return;
-                }
-
-                s_originalOnUpdate = s_onUpdateProp.GetValue(s_nativeRuntimeInstance) as Delegate;
-
-                var delegateType = isAssembly.GetType(
-                    "UnityEngine.InputSystem.LowLevel.InputUpdateDelegate");
-                if (delegateType == null)
-                {
-                    Debug.LogWarning("[InputUtility] Cannot find InputUpdateDelegate type.");
-                    return;
-                }
-
-                var interceptMethod = typeof(InputUtility).GetMethod(
-                    nameof(NativeInputInterceptor), BindingFlags.NonPublic | BindingFlags.Static);
-                var interceptDelegate = Delegate.CreateDelegate(delegateType, interceptMethod);
-
-                s_onUpdateProp.SetValue(s_nativeRuntimeInstance, interceptDelegate);
-
-                s_originalOnUpdateMethod = s_originalOnUpdate?.Method;
-                s_originalOnUpdateTarget = s_originalOnUpdate?.Target;
-
-                EditorApplication.playModeStateChanged += OnPlayModeChanged;
-                s_nativeHookInstalled = true;
-            }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[InputUtility] Failed to install native input hook: {ex}");
-            }
+            if (s_onAfterUpdateHooked) return;
+            InputSystem.onAfterUpdate += OnAfterInputSystemUpdate;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            s_onAfterUpdateHooked = true;
         }
 
-        private static void NativeInputInterceptor(InputUpdateType updateType, ref InputEventBuffer eventBuffer)
+        private static void OnAfterInputSystemUpdate()
         {
-            // Let hardware events through (don't Reset — that breaks Screen.width/height etc.),
-            // then overwrite keyboard/mouse state AFTER the update processes.
-            if (s_originalOnUpdateMethod != null)
-            {
-                s_interceptorArgs[0] = updateType;
-                s_interceptorArgs[1] = eventBuffer;
-                s_originalOnUpdateMethod.Invoke(s_originalOnUpdateTarget, s_interceptorArgs);
-                eventBuffer = (InputEventBuffer)s_interceptorArgs[1];
-            }
-
             if (HasSyntheticInput)
                 ReapplySyntheticState();
         }
