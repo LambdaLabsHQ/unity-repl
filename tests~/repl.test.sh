@@ -12,6 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPL="$(cd "$SCRIPT_DIR/.." && pwd)/repl.sh"
 MOCK="$SCRIPT_DIR/mock_unity.sh"
 FIXTURE="$SCRIPT_DIR/fixtures/hello.cs"
+VALIDATE_FIXTURE="$SCRIPT_DIR/fixtures/validate_stacked.cs"
 
 # Sandbox project dir
 WORK=$(mktemp -d -t repl-test.XXXXXX)
@@ -149,6 +150,19 @@ assert_case "14. --help" 0 "SKIP_STDOUT" "" \
 # 15. --timeout non-numeric → exit 3
 assert_case "15. --timeout non-numeric" 3 "" "positive integer" \
     bash "$REPL" --timeout abc -e "__ok__y"
+
+# 16. --validate on good code → exit 0, stdout COMPILE OK
+assert_case "16. --validate good code" 0 "COMPILE OK" "" \
+    bash "$REPL" --validate -e "__validate_ok__"
+
+# 17. --validate on bad code → exit 2, stderr contains COMPILE ERROR:
+assert_case "17. --validate bad code" 2 "" "COMPILE ERROR:" \
+    bash "$REPL" --validate -e "__validate_bad__"
+
+# 18. --validate -f with stacked //!timeout= directive in fixture → exit 0, COMPILE OK.
+# Exercises the directive-stacking path (timeout line + validate flag both honored).
+assert_case "18. --validate -f with stacked //!timeout= directive" 0 "COMPILE OK" "" \
+    bash "$REPL" --validate -f "$VALIDATE_FIXTURE"
 
 echo "=== $PASS passed, $FAIL failed ==="
 [ "$FAIL" = 0 ]

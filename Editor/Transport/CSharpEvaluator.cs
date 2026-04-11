@@ -34,8 +34,10 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
     internal class CSharpEvaluator
     {
         private object _evaluator;
-        private MethodInfo _evaluate;
+        private MethodInfo _compile;       // two-arg: string Compile(string, out CompiledMethod)
+        private MethodInfo _compileSingle; // one-arg fallback: CompiledMethod Compile(string)
         private MethodInfo _run;
+        private Type _compiledMethodType;
         private StringWriter _errorWriter;
         private bool _ready;
         private string _initError;
@@ -94,9 +96,18 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
             _evaluator = evalCtor.Invoke(new[] { context });
 
             _run = evaluatorType.GetMethod("Run", new[] { typeof(string) });
-            _evaluate = evaluatorType.GetMethod("Evaluate", new[] {
-                typeof(string), typeof(object).MakeByRefType(), typeof(bool).MakeByRefType()
+
+            _compiledMethodType = asm.GetType("Mono.CSharp.CompiledMethod")
+                ?? throw new TypeLoadException("Cannot find Mono.CSharp.CompiledMethod");
+            // Two-arg form preserves the "unparsed tail" signal used for INCOMPLETE: classification.
+            _compile = evaluatorType.GetMethod("Compile", new[] {
+                typeof(string), _compiledMethodType.MakeByRefType()
             });
+            // One-arg form is a structural fallback for exotic Mono.CSharp builds; it
+            // collapses "incomplete input" into plain compile errors.
+            _compileSingle = evaluatorType.GetMethod("Compile", new[] { typeof(string) });
+            if (_compile == null && _compileSingle == null)
+                throw new MissingMethodException("Mono.CSharp.Evaluator.Compile(...)");
 
             // Reference loaded assemblies, skipping those Mono.CSharp.Evaluator already
             // pre-references internally. Adding mscorlib/System/System.Core/etc. a second
@@ -146,61 +157,54 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
             // Clear previous errors
             _errorWriter.GetStringBuilder().Clear();
 
+            // Phase 1 — compile only. Never invokes user code. If compilation fails
+            // the returned delegate is null and the error writer has the diagnostics.
+            object compiledObj;
+            string partial;
             try
             {
-                var args = new object[] { code, null, false };
-                string partial = (string)_evaluate.Invoke(_evaluator, args);
+                if (!TryCompile(code, out compiledObj, out partial))
+                    return EvalOutcome.Value($"COMPILE ERROR:\n{_errorWriter.ToString().Trim()}");
+            }
+            catch (TargetInvocationException ex)
+            {
+                var inner = ex.InnerException;
+                return EvalOutcome.Value($"COMPILE ERROR: {inner?.Message ?? ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return EvalOutcome.Value($"ERROR: {ex.Message}\n{ex.StackTrace}");
+            }
 
-                // Check for compiler errors. Mono.CSharp emits both errors AND warnings
-                // to the same printer, so distinguish them: only "error CS####" lines
-                // should fail the eval. Warning-only output is logged to Unity console
-                // and the eval continues normally.
-                string diagnostics = _errorWriter.ToString().Trim();
-                if (!string.IsNullOrEmpty(diagnostics))
-                {
-                    if (HasCompileErrors(diagnostics))
-                        return EvalOutcome.Value($"COMPILE ERROR:\n{diagnostics}");
-                    Debug.LogWarning($"[UnityREPL] Compile warnings:\n{diagnostics}");
-                }
+            string diagnostics = _errorWriter.ToString().Trim();
+            if (!string.IsNullOrEmpty(diagnostics))
+            {
+                if (HasCompileErrors(diagnostics))
+                    return EvalOutcome.Value($"COMPILE ERROR:\n{diagnostics}");
+                Debug.LogWarning($"[UnityREPL] Compile warnings:\n{diagnostics}");
+            }
 
-                if (partial != null)
-                {
-                    // Declarations (methods, classes) and some multi-statement inputs are
-                    // reported as partial by Evaluate(); retry via Run() which accepts them.
-                    _errorWriter.GetStringBuilder().Clear();
-                    bool ranOk;
-                    try
-                    {
-                        ranOk = (bool)_run.Invoke(_evaluator, new object[] { code });
-                    }
-                    catch (TargetInvocationException rex)
-                    {
-                        var rinner = rex.InnerException;
-                        return EvalOutcome.Value($"RUNTIME ERROR: {rinner?.Message ?? rex.Message}\n{rinner?.StackTrace ?? rex.StackTrace}");
-                    }
-                    string runDiagnostics = _errorWriter.ToString().Trim();
-                    if (!string.IsNullOrEmpty(runDiagnostics))
-                    {
-                        if (HasCompileErrors(runDiagnostics))
-                            return EvalOutcome.Value($"COMPILE ERROR:\n{runDiagnostics}");
-                        Debug.LogWarning($"[UnityREPL] Compile warnings:\n{runDiagnostics}");
-                    }
-                    if (!ranOk)
-                        return EvalOutcome.Value($"INCOMPLETE: {partial}");
-                    return EvalOutcome.Value("(ok)");
-                }
+            // Incomplete input — parser needed more tokens. Preserve the old INCOMPLETE:
+            // classification so repl.sh / repl.bat exit-code routing (exit 2) is stable.
+            if (!string.IsNullOrEmpty(partial))
+                return EvalOutcome.Value($"INCOMPLETE: {partial}");
 
-                bool resultSet = (bool)args[2];
-                object result = args[1];
-
-                if (resultSet)
-                {
-                    if (result is IEnumerator ienum)
-                        return EvalOutcome.FromCoroutine(ienum);
-                    return EvalOutcome.Value(result?.ToString() ?? "(null)");
-                }
-
+            // Declaration-only input (class/method/field): Compile returns a null
+            // delegate but has already registered the definition in evaluator state.
+            if (compiledObj == null)
                 return EvalOutcome.Value("(ok)");
+
+            // Phase 2 — invoke the CompiledMethod delegate:
+            //   delegate void CompiledMethod(ref object result);
+            // DynamicInvoke marshals the ref parameter back via the args array.
+            try
+            {
+                var invokeArgs = new object[] { null };
+                ((Delegate)compiledObj).DynamicInvoke(invokeArgs);
+                object result = invokeArgs[0];
+                if (result is IEnumerator ienum)
+                    return EvalOutcome.FromCoroutine(ienum);
+                return EvalOutcome.Value(result?.ToString() ?? "(ok)");
             }
             catch (TargetInvocationException ex)
             {
@@ -211,6 +215,76 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
             {
                 return EvalOutcome.Value($"ERROR: {ex.Message}\n{ex.StackTrace}");
             }
+        }
+
+        /// <summary>
+        /// Compile-only dry-run. Returns one of:
+        ///   "COMPILE OK"            — expression/statement compiled cleanly
+        ///   "COMPILE OK (no-op)"    — pure declaration compiled (note: already
+        ///                             registered in evaluator state — Validate is
+        ///                             NOT side-effect-free for class/method/field
+        ///                             declarations)
+        ///   "INCOMPLETE: ..."       — parser needs more tokens
+        ///   "COMPILE ERROR: ..."    — syntax/semantic error
+        /// Never invokes the compiled delegate, so expression/statement inputs have
+        /// no runtime side effects.
+        /// </summary>
+        public string Validate(string code)
+        {
+            if (!_ready)
+                return $"ERROR: evaluator not initialized\n{_initError}";
+
+            _errorWriter.GetStringBuilder().Clear();
+
+            object compiled;
+            string partial;
+            try
+            {
+                if (!TryCompile(code, out compiled, out partial))
+                    return $"COMPILE ERROR:\n{_errorWriter.ToString().Trim()}";
+            }
+            catch (TargetInvocationException ex)
+            {
+                return $"COMPILE ERROR: {ex.InnerException?.Message ?? ex.Message}";
+            }
+            catch (Exception ex)
+            {
+                return $"ERROR: {ex.Message}";
+            }
+
+            string diagnostics = _errorWriter.ToString().Trim();
+            if (!string.IsNullOrEmpty(diagnostics) && HasCompileErrors(diagnostics))
+                return $"COMPILE ERROR:\n{diagnostics}";
+            if (!string.IsNullOrEmpty(partial))
+                return $"INCOMPLETE: {partial}";
+            return compiled != null ? "COMPILE OK" : "COMPILE OK (no-op)";
+        }
+
+        /// <summary>
+        /// Calls Mono.CSharp.Evaluator.Compile via reflection. Prefers the two-arg
+        /// overload so the unparsed-tail signal (used for INCOMPLETE: classification)
+        /// is preserved; falls back to the one-arg overload otherwise.
+        /// Returns false if neither overload is available (should not happen —
+        /// Init() already validated this).
+        /// </summary>
+        private bool TryCompile(string code, out object compiled, out string partial)
+        {
+            if (_compile != null)
+            {
+                var args = new object[] { code, null };
+                partial = (string)_compile.Invoke(_evaluator, args);
+                compiled = args[1];
+                return true;
+            }
+            if (_compileSingle != null)
+            {
+                compiled = _compileSingle.Invoke(_evaluator, new object[] { code });
+                partial = null;
+                return true;
+            }
+            compiled = null;
+            partial = null;
+            return false;
         }
 
         /// <summary>

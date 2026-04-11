@@ -42,6 +42,19 @@ No quoting gymnastics, no persistent session, no manual file IPC. Prefer `-f` fo
 
 On Windows, **any argument** to `repl.bat` triggers one-shot mode (cmd.exe TTY detection is unreliable).
 
+### Dry-run validation (`--validate` / `-V`)
+
+Pair with any code source (`-e`, `-f`, `-`, or piped stdin) to compile without executing:
+
+```bash
+./repl.sh --validate -e 'EditorApplication.isPlaying = true'    # → COMPILE OK (did NOT toggle Play Mode)
+./repl.sh -V -f snippet.cs                                       # → COMPILE ERROR: ... if snippet.cs has syntax errors
+```
+
+Responses: `COMPILE OK` (exit 0), `COMPILE ERROR: ...` (exit 2), `INCOMPLETE: ...` (exit 2). Use this for agent-side sanity checks before committing a risky eval.
+
+**Caveat — declarations still mutate state.** Mono.CSharp registers class/method/field definitions during the compile phase, so `--validate -e 'class Foo {}'` still adds `Foo` to the persistent evaluator namespace. Validation is only side-effect-free for expressions and statements; declarations are not.
+
 ## Basic Usage
 
 Directly input C# expressions or statements, one per line:
