@@ -2,6 +2,16 @@
 
 Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC, providing an architecture that is fundamentally superior to both rigid MCP (Model Context Protocol) servers and standard CLI wrappers. Instead of granting AI agents a pre-approved menu of parsed arguments or JSON-RPC endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
 
+---
+
+<p align="center">
+  <video src="https://github.com/LambdaLabsHQ/unity-repl/releases/download/readme-assets/unity-repl-2x.mp4" autoplay muted loop playsinline width="100%"></video>
+</p>
+
+> Watch the agent explore the Unity Editor and game entirely through raw C# REPL — no pre-registered MCP tools, no hardcoded wrappers. It discovers APIs on the fly and gradually crystallizes its actions into reusable REPL scripts.
+
+---
+
 ## A Live Session: Infinite Control
 
 How deep does the control go? Here is a raw transcript of an Agent dynamically probing and mutating a highly complex Unity state without any pre-configured tools:
