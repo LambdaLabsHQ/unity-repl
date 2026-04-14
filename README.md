@@ -82,7 +82,15 @@ ComplexSetup()
 
 ## Quickstart
 
-This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`. 
+This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`.
+
+### Recommended: Install the Skill
+
+If you are an AI agent, the preferred way to use Unity REPL is to install the `unity-repl` skill into your context. This provides direct, structured access to the full C# evaluation surface without manual CLI invocation or path tracking.
+
+The skill is defined in `.agents/skills/unity-repl/SKILL.md` in this repository. Once loaded in your context, invoke it directly to evaluate expressions on the Unity Editor Main Thread.
+
+### Manual Setup
 
 1. Add the following to your Unity project's `Packages/manifest.json`:
    ```json
@@ -95,7 +103,7 @@ This package embeds the persistent REPL server seamlessly into your Unity Editor
    }
    ```
 2. The Editor continuously listens for C# compilation requests locally.
-3. Drive the engine using the native REPL wrapper via any autonomous agent (or manual shell):
+3. Drive the engine using the native REPL wrapper:
 
 **Mac / Linux**:
 ```bash

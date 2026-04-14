@@ -3,9 +3,20 @@ name: unity-repl
 description: Executes raw C# expressions and statements directly on the Unity Editor Main Thread via file-based IPC. Use this to query state, modify the scene, and execute Unity API commands with infinite control.
 ---
 
-# UnityREPL
+# UnityREPL Skill
 
 UnityREPL evaluates your native C# statements directly in the running Unity Editor. You command the engine's runtime memory, scene graph, and complete API surface directly without predefined tools.
+
+> **Agent note:** This is the preferred interface for Unity REPL. When this skill is loaded in your context, use it directly instead of manually calling `repl.sh` / `repl.bat`.
+
+## Quick Reference
+
+| Task | Example |
+|------|---------|
+| One-shot eval | `./Packages/com.lambda-labs.unity-repl/repl.sh -e 'SceneManager.GetActiveScene().name'` |
+| Eval file | `./Packages/com.lambda-labs.unity-repl/repl.sh -f snippet.cs` |
+| Coroutine timeout | `//!timeout=30s` as first line in the file |
+| Preloaded namespaces | `UnityEngine`, `UnityEditor`, `System.Linq`, `UnityEngine.SceneManagement`, etc. |
 
 ## Launching
 
