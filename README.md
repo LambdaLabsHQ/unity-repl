@@ -1,5 +1,7 @@
 # Unity REPL: The most powerful AI interface for Unity
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://github.com/LambdaLabsHQ/unity-repl/blob/master/LICENSE)
+
 Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC, providing an architecture that is fundamentally superior to both rigid MCP (Model Context Protocol) servers and standard CLI wrappers. Instead of granting AI agents a pre-approved menu of parsed arguments or JSON-RPC endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
 
 ---
@@ -11,6 +13,12 @@ Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a 
 > Watch the agent explore the Unity Editor and game entirely through raw C# REPL — no pre-registered MCP tools, no hardcoded wrappers. It discovers APIs on the fly and gradually crystallizes its actions into reusable REPL scripts.
 
 ---
+
+## Requirements
+
+- **Unity 2021.3** or later
+- Editor-only — no runtime dependencies
+- Windows, macOS, Linux
 
 ## A Live Session: Infinite Control
 
@@ -101,41 +109,42 @@ Setup.ComplexSetup()
 
 This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`.
 
-### Recommended: Install the Skill
-
-If you are an AI agent, the preferred way to use Unity REPL is to install the `unity-repl` skill into your context. This provides direct, structured access to the full C# evaluation surface without manual CLI invocation or path tracking.
-
-Install via the standard skill CLI:
-
-```bash
-npx skills add LambdaLabsHQ/unity-repl
-```
-
-The skill is defined in `.agents/skills/unity-repl/SKILL.md` in this repository. Once installed, invoke it directly to evaluate expressions on the Unity Editor Main Thread.
-
 ### Manual Setup
 
-1. Add the following to your Unity project's `Packages/manifest.json`:
+1. **Add the Unity package.** Use the Unity Package Manager (Window > Package Manager > Add by git URL) or edit `Packages/manifest.json` directly:
    ```json
    {
      "dependencies": {
-       "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git",
-       "com.lambda-labs.unity-agent-input": "https://github.com/LambdaLabsHQ/unity-agent-input.git",
-       "com.lambda-labs.unity-agent-vision": "https://github.com/LambdaLabsHQ/unity-agent-vision.git"
+       "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"
      }
    }
    ```
-2. The Editor continuously listens for C# compilation requests locally.
-3. Drive the engine using the native REPL wrapper:
 
-**Mac / Linux**:
-```bash
-./Packages/com.lambda-labs.unity-repl/repl.sh
+2. **Register the skill.** This teaches your AI agent (Claude Code, Cursor, Codex CLI, etc.) how to use the REPL — call conventions, response formats, coroutine patterns, and ability discovery:
+   ```bash
+   npx skills add ./Packages/com.lambda-labs.unity-repl
+   ```
+
+3. **Verify.** With the Unity Editor open, invoke the skill from your agent (e.g. `/unity-repl what is the Unity version`).
+
+**Optional companion packages.** These are _not_ required. If installed, they register additional abilities (input simulation, screenshots) via `ReplAbilityRegistry` that agents can discover at runtime:
+```json
+"com.lambda-labs.unity-agent-input": "https://github.com/LambdaLabsHQ/unity-agent-input.git",
+"com.lambda-labs.unity-agent-vision": "https://github.com/LambdaLabsHQ/unity-agent-vision.git"
 ```
 
-**Windows**:
-```cmd
-.\Packages\com.lambda-labs.unity-repl\repl.bat
+### Agent Setup Prompt
+
+Copy and paste the following prompt to your AI agent to have it install Unity REPL for you:
+
+```
+Add `"com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"` to the `dependencies` in `Packages/manifest.json`.
+
+Then register the Unity REPL skill: try running `npx skills add ./Packages/com.lambda-labs.unity-repl`.
+
+If that fails (e.g. Node.js is not installed), the skill definition is at `./Packages/com.lambda-labs.unity-repl/.agents/skills/unity-repl/SKILL.md` — use your agent runtime's skill installer to register it.
+
+Finally, verify the REPL server is working by evaluating `Application.unityVersion` through the skill.
 ```
 
 ### Non-interactive invocation
@@ -230,3 +239,11 @@ AI Agent  ──(Raw C# Tokens)──►  File IPC (/Temp/UnityReplIpc/)  ──
 ```
 
 **Welcome to the era of unrestricted access. The language is your only tool.**
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+[AGPL-3.0](LICENSE) — Copyright (C) 2025-2026 LambdaLabs
