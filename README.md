@@ -84,7 +84,16 @@ ComplexSetup()
 
 This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`. 
 
-1. Add this package to your Unity project.
+1. Add the following to your Unity project's `Packages/manifest.json`:
+   ```json
+   {
+     "dependencies": {
+       "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git",
+       "com.lambda-labs.unity-agent-input": "https://github.com/LambdaLabsHQ/unity-agent-input.git",
+       "com.lambda-labs.unity-agent-vision": "https://github.com/LambdaLabsHQ/unity-agent-vision.git"
+     }
+   }
+   ```
 2. The Editor continuously listens for C# compilation requests locally.
 3. Drive the engine using the native REPL wrapper via any autonomous agent (or manual shell):
 
