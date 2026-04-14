@@ -28,6 +28,7 @@ if "%~1"=="" goto interactive
 set "SRC_KIND="
 set "SRC_VAL="
 set "CODE_FILE="
+set "VALIDATE=0"
 
 :parse_loop
 if "%~1"=="" goto dispatch
@@ -44,10 +45,17 @@ if "%~1"=="-" (
     shift
     goto parse_loop
 )
+if /i "%~1"=="-V" goto flag_validate
+if /i "%~1"=="--validate" goto flag_validate
 if /i "%~1"=="--timeout" goto flag_timeout
 echo ERROR: unknown argument: %~1 1>&2
 call :print_usage 1>&2
 exit /b 3
+
+:flag_validate
+set "VALIDATE=1"
+shift
+goto parse_loop
 
 :flag_eval
 if "%~2"=="" (
@@ -114,6 +122,12 @@ if "%SRC_KIND%"=="eval" (
     powershell -NoProfile -Command "[IO.File]::WriteAllText('%REQ_TMP%', [Console]::In.ReadToEnd())"
 )
 
+:: Prepend //!validate directive when -V/--validate was requested. The
+:: transport's directive parser strips it and routes to Validate().
+if "%VALIDATE%"=="1" (
+    powershell -NoProfile -Command "$b = [IO.File]::ReadAllText('%REQ_TMP%'); [IO.File]::WriteAllText('%REQ_TMP%', \"//!validate`n$b\")"
+)
+
 move /Y "%REQ_TMP%" "%REQ_FILE%" >nul
 
 :: Wait for response
@@ -152,6 +166,7 @@ echo   -e, --eval CODE      Evaluate CODE and exit
 echo   -p, --print CODE     Same as --eval (Node-style alias^)
 echo   -f, --file PATH      Evaluate file contents and exit
 echo   -                    Read code from stdin explicitly
+echo   -V, --validate       Compile-only dry run (no execution^)
 echo   --timeout SECONDS    Override timeout (default: 60, env: REPL_TIMEOUT^)
 echo   -h, --help           Show this help
 echo.

@@ -27,6 +27,9 @@ Usage: repl.sh [options] [-]
   -p, --print CODE     Same as --eval (Node-style alias)
   -f, --file PATH      Evaluate file contents and exit
   -                    Read code from stdin explicitly
+  -V, --validate       Compile-only dry run (no execution); prints COMPILE OK
+                       or COMPILE ERROR / INCOMPLETE. Declarations still mutate
+                       evaluator state; expression/statement inputs do not.
   --timeout SECONDS    Override one-shot timeout (default: 60, env: REPL_TIMEOUT)
   -h, --help           Show this help
 
@@ -159,6 +162,7 @@ fi
 SRC_KIND=tty
 SRC_VAL=
 ANY_FLAG=0
+VALIDATE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -180,6 +184,8 @@ while [ $# -gt 0 ]; do
             SRC_VAL="$2"; shift 2 ;;
         -)
             ANY_FLAG=1; SRC_KIND=stdin; shift ;;
+        -V|--validate)
+            VALIDATE=1; shift ;;
         --timeout)
             if [ $# -lt 2 ]; then
                 echo "ERROR: --timeout requires seconds" >&2
@@ -219,6 +225,15 @@ run_oneshot() {
             code=$(read_all_stdin; printf x)
             code="${code%x}" ;;
     esac
+
+    # Prepend the //!validate directive when requested. The transport's
+    # directive parser strips it and routes to CSharpEvaluator.Validate().
+    # x-sentinel preserves any trailing newlines in the original body (command
+    # substitution would otherwise strip them and break -f byte-exactness).
+    if [ "$VALIDATE" = 1 ]; then
+        code=$(printf '//!validate\n%s' "$code"; printf x)
+        code="${code%x}"
+    fi
 
     # Scoped cleanup for this UUID (concurrent runs use different UUIDs, safe).
     # INT stays bound to on_int (set globally above) so Ctrl-C sends .cancel.

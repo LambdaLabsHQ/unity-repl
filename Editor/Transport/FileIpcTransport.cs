@@ -80,9 +80,19 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
                 var resPath = Path.Combine(_resDir, $"{uuid}.res");
 
                 int timeoutMs;
+                bool validateOnly;
                 string userCode;
-                ParseTimeoutDirective(code, out userCode, out timeoutMs);
+                ParseDirectives(code, out userCode, out timeoutMs, out validateOnly);
                 userCode = userCode.Trim();
+
+                if (validateOnly)
+                {
+                    string text;
+                    try { text = _evaluator.Validate(userCode); }
+                    catch (Exception ex) { text = $"ERROR: {ex.Message}"; }
+                    WriteResponse(resPath, text);
+                    continue;
+                }
 
                 EvalOutcome outcome;
                 try
@@ -126,26 +136,46 @@ namespace LambdaLabs.UnityRepl.Editor.Transport
         }
 
         /// <summary>
-        /// Parses an optional first-line directive like <c>//!timeout=30s</c>.
-        /// Strips the directive line from the input and returns the timeout in milliseconds.
-        /// Supported formats: <c>30s</c>, <c>2m</c>, <c>5000</c> (bare ms).
+        /// Parses leading <c>//!</c>-prefixed directive lines. Supported:
+        ///   <c>//!timeout=30s</c> — per-request timeout (formats: <c>30s</c>, <c>2m</c>, <c>5000</c>).
+        ///   <c>//!validate</c>   — compile-only dry run (no execution).
+        /// Directives may stack in any order on the leading lines of the request;
+        /// consumed lines are stripped from <paramref name="userCode"/>.
         /// </summary>
-        private static void ParseTimeoutDirective(string code, out string userCode, out int timeoutMs)
+        private static void ParseDirectives(string code, out string userCode, out int timeoutMs, out bool validateOnly)
         {
             timeoutMs = DefaultTimeoutMs;
-            userCode = code;
-            if (string.IsNullOrEmpty(code)) return;
+            validateOnly = false;
+            userCode = code ?? string.Empty;
 
-            int lineEnd = code.IndexOf('\n');
-            string firstLine = (lineEnd >= 0 ? code.Substring(0, lineEnd) : code).TrimEnd('\r', ' ', '\t');
-            const string prefix = "//!timeout=";
-            if (!firstLine.StartsWith(prefix, StringComparison.Ordinal)) return;
+            while (!string.IsNullOrEmpty(userCode))
+            {
+                int lineEnd = userCode.IndexOf('\n');
+                string firstLine = (lineEnd >= 0 ? userCode.Substring(0, lineEnd) : userCode).TrimEnd('\r', ' ', '\t');
+                if (!firstLine.StartsWith("//!", StringComparison.Ordinal))
+                    return;
 
-            string value = firstLine.Substring(prefix.Length).Trim();
-            if (TryParseTimeout(value, out int ms))
-                timeoutMs = ms;
+                const string timeoutPrefix = "//!timeout=";
+                if (firstLine.StartsWith(timeoutPrefix, StringComparison.Ordinal))
+                {
+                    string value = firstLine.Substring(timeoutPrefix.Length).Trim();
+                    if (TryParseTimeout(value, out int ms))
+                        timeoutMs = ms;
+                }
+                else if (firstLine == "//!validate")
+                {
+                    validateOnly = true;
+                }
+                else
+                {
+                    // Unknown //! directive — leave the line in userCode so the
+                    // evaluator surfaces a real compile error rather than silently
+                    // swallowing typos.
+                    return;
+                }
 
-            userCode = lineEnd >= 0 ? code.Substring(lineEnd + 1) : string.Empty;
+                userCode = lineEnd >= 0 ? userCode.Substring(lineEnd + 1) : string.Empty;
+            }
         }
 
         private static bool TryParseTimeout(string s, out int ms)

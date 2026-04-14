@@ -41,18 +41,25 @@ In conventional JSON-RPC or MCP tool architectures, waiting for a scene to load 
 
 ```csharp
 // Call 1 — define the helper (persists in the session)
-IEnumerator ComplexSetup() {
-    EditorSceneManager.OpenScene("Assets/Scenes/TestScene.unity");
-    yield return null;                      // one editor tick
-    var go = new GameObject("TestEnemy");
-    yield return new WaitForSeconds(2.0f);  // delay across real seconds
-    go.GetComponent<Health>().Damage(10);
-    yield return "done";                    // last yielded value → .res response
+// Mono.CSharp requires a wrapper class — top-level methods are not supported.
+public static class Setup {
+    public static System.Collections.IEnumerator ComplexSetup() {
+        EditorSceneManager.OpenScene("Assets/Scenes/TestScene.unity");
+        yield return null;                      // one editor tick
+        var go = new GameObject("TestEnemy");
+        yield return new WaitForSeconds(2.0f);  // delay across real seconds
+        go.GetComponent<Health>().Damage(10);
+        yield return "done";                    // last yielded value → .res response
+    }
 }
-
-// Call 2 — invoke it; .res arrives ~2 seconds later with value "done"
-ComplexSetup()
 ```
+
+```csharp
+// Call 2 — invoke it; .res arrives ~2 seconds later with value "done"
+Setup.ComplexSetup()
+```
+
+> **Note:** Class definitions and invocations must be separate REPL calls. Each input is compiled as a single unit.
 
 **Supported yield instructions:**
 
@@ -157,6 +164,24 @@ echo 'AssetDatabase.Refresh()' | ./repl.sh
 | 4    | timeout waiting for Unity |
 
 On Windows, **any argument** puts `repl.bat` in non-interactive mode (cmd.exe TTY detection is unreliable, so detection is via arg-presence instead of stdin piping).
+
+### Dry-run validation (`--validate` / `-V`)
+
+Compile without executing — useful for syntax checking, linting, or pre-flight validation:
+
+```bash
+./repl.sh --validate -e 'EditorApplication.isPlaying = true'   # → COMPILE OK (did NOT toggle Play Mode)
+./repl.sh -V -f snippet.cs                                      # → COMPILE ERROR: ... if syntax errors
+./repl.sh --validate -e 'class Foo {}'                          # → COMPILE OK (and Foo is NOT left in session)
+```
+
+Responses: `COMPILE OK` (exit 0), `COMPILE OK (no-op)` for declarations (exit 0), `COMPILE ERROR: ...` (exit 2), `INCOMPLETE: ...` (exit 2). Declaration rollback is automatic when supported by the runtime — the validated code leaves no side effects in the evaluator session.
+
+Alternatively, prepend `//!validate` as an inline directive in the source:
+```csharp
+//!validate
+EditorApplication.isPlaying = true
+```
 
 ## The Post-Tool AI Architecture
 

@@ -13,7 +13,13 @@
 #   __runtime__      -> RUNTIME ERROR response
 #   __generic__      -> ERROR response
 #   __sleep__        -> sleep 10s before responding (forces client timeout)
+#   __validate_ok__  -> COMPILE OK (for --validate tests; requires //!validate directive)
+#   __validate_bad__ -> COMPILE ERROR (for --validate tests; requires //!validate directive)
 #   anything else    -> echo the code as-is
+#
+# Leading //!timeout=... and //!validate directive lines are stripped before
+# pattern matching (they are consumed by the real transport the same way).
+# __validate_ok__ / __validate_bad__ only match when //!validate was present.
 
 set -u
 
@@ -43,8 +49,36 @@ process_request() {
     code="${code%x}"
     rm -f "$req_file"
 
+    # Strip leading //!-prefixed directive lines (any order, stackable).
+    # Tracks whether //!validate was present to gate the validate-only magic strings.
+    local validate_only=0
+    while :; do
+        case "$code" in
+            "//!validate"$'\n'*)
+                validate_only=1
+                code="${code#*$'\n'}" ;;
+            "//!timeout="*$'\n'*)
+                code="${code#*$'\n'}" ;;
+            *)
+                break ;;
+        esac
+    done
+
     # Strip trailing newline for pattern matching only (keep original for __echo__)
     local match="${code%$'\n'}"
+
+    if [ "$validate_only" = 1 ]; then
+        case "$match" in
+            __validate_ok__)
+                write_res_atomic "$uuid" "COMPILE OK" ;;
+            __validate_bad__)
+                write_res_atomic "$uuid" "COMPILE ERROR:
+(1,5): error CS0103: The name 'foo' does not exist" ;;
+            *)
+                write_res_atomic "$uuid" "COMPILE OK" ;;
+        esac
+        return
+    fi
 
     case "$match" in
         __ok__*)
