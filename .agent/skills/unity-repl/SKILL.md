@@ -49,11 +49,16 @@ Pair with any code source (`-e`, `-f`, `-`, or piped stdin) to compile without e
 ```bash
 ./repl.sh --validate -e 'EditorApplication.isPlaying = true'    # → COMPILE OK (did NOT toggle Play Mode)
 ./repl.sh -V -f snippet.cs                                       # → COMPILE ERROR: ... if snippet.cs has syntax errors
+./repl.sh --validate -e 'class Foo {}'                           # → COMPILE OK (and Foo is NOT left in the session)
 ```
 
 Responses: `COMPILE OK` (exit 0), `COMPILE ERROR: ...` (exit 2), `INCOMPLETE: ...` (exit 2). Use this for agent-side sanity checks before committing a risky eval.
 
-**Caveat — declarations still mutate state.** Mono.CSharp registers class/method/field definitions during the compile phase, so `--validate -e 'class Foo {}'` still adds `Foo` to the persistent evaluator namespace. Validation is only side-effect-free for expressions and statements; declarations are not.
+**Side-effect freedom.** Validate compiles in isolation and then rolls back the evaluator's declaration state (top-level `var`/field dict, `using` directives, and type containers on the source file). Expressions, statements, `var` declarations, `using` directives, and `class`/`struct`/`method` declarations are all side-effect-free.
+
+**Remaining caveat — redefining an existing variable.** Mono.CSharp nulls a variable's previous field value *before* the new definition is written, so `--validate -e 'var x = 100;'` when `x` already holds a value will leave `x` bound but null afterwards. Name bindings are restored by rollback, but original runtime values of re-declared vars are not. Avoid using `--validate` to probe variable redefinitions in a live session.
+
+**Fallback.** If rollback wiring fails at startup (e.g. future Unity ships an incompatible Mono.CSharp layout), Validate degrades to the pre-rollback behavior and logs `Validate rollback DISABLED` in the Unity Console. Check `[UnityREPL] Evaluator ready` on startup for `Validate rollback enabled` to confirm.
 
 ## Basic Usage
 
