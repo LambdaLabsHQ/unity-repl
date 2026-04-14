@@ -2,27 +2,39 @@
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://github.com/LambdaLabsHQ/unity-repl/blob/master/LICENSE)
 
-Unity REPL evaluates raw C# strings directly on the Unity Main Thread through a high-performance File IPC, providing an architecture that is fundamentally superior to both rigid MCP (Model Context Protocol) servers and standard CLI wrappers. Instead of granting AI agents a pre-approved menu of parsed arguments or JSON-RPC endpoints, we grant them the engine itself. **The meta-language becomes the universal tool.**
+> Any sufficiently complicated C or Fortran program contains an ad hoc, informally-specified, bug-ridden, slow implementation of half of Common Lisp.
+>
+> — *Greenspun's Tenth Rule*
 
----
+An interpreter that evaluates an AI's output as code is superior to any form of tool-calling infrastructure, including MCP and CLI.
+
+MCP servers and CLI wrappers are ad hoc interpreters slowly reconstructing what a REPL already is. **Unity REPL** skips the middleman: it grants AI agents direct, evaluative access to the Unity Main Thread through raw C# — no schemas, no wrappers, no human-curated endpoints. Token becomes language, language becomes execution, execution becomes the universal tool.
 
 <p align="center">
-  <video src="https://github.com/LambdaLabsHQ/unity-repl/releases/download/readme-assets/unity-repl-2x.mp4" autoplay muted loop playsinline width="100%"></video>
+  <video src="https://github.com/user-attachments/assets/c4d04f42-6495-4a8a-a6e8-aa5dd997bd22" controls width="100%"></video>
 </p>
 
-> Watch the agent explore the Unity Editor and game entirely through raw C# REPL — no pre-registered MCP tools, no hardcoded wrappers. It discovers APIs on the fly and gradually crystallizes its actions into reusable REPL scripts.
+> The agent executes a REPL script it previously discovered and crystallized from an earlier agent exploration session — which also used Unity REPL — with no pre-registered MCP tools and no hardcoded wrappers. Exploration turns into reusable automation.
 
----
+## Getting Started
 
-## Requirements
+Open your coding agent inside a Unity project, then paste the following prompt to install Unity REPL:
 
-- **Unity 2021.3** or later
-- Editor-only — no runtime dependencies
-- Windows, macOS, Linux
+```
+Add `"com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"` to the `dependencies` in `Packages/manifest.json`.
+
+Then register the Unity REPL skill: try running `npx skills add ./Packages/com.lambda-labs.unity-repl`.
+
+If that fails (e.g. Node.js is not installed), the skill definition is at `./Packages/com.lambda-labs.unity-repl/.agents/skills/unity-repl/SKILL.md` — use your agent runtime's skill installer to register it.
+
+Finally, verify the REPL server is working by evaluating `Application.unityVersion` through the skill.
+```
+
+For step-by-step manual instructions, see [Manual install](#manual-install).
 
 ## A Live Session: Infinite Control
 
-How deep does the control go? Here is a raw transcript of an Agent dynamically probing and mutating a highly complex Unity state without any pre-configured tools:
+How deep does the control go? Here is a raw transcript of an agent dynamically probing and mutating a highly complex Unity state without any pre-configured tools:
 
 ```text
 UnityREPL ready. Type C# expressions:
@@ -105,20 +117,28 @@ Setup.ComplexSetup()
 - Set the client env var `TIMEOUT_S` to extend how long `repl.sh`/`repl.bat` wait for `.res` (align with your `//!timeout=`).
 - Drop an empty file at `Temp/UnityReplIpc/Requests/{uuid}.cancel` to abort a running coroutine. `repl.sh` does this automatically on the first `Ctrl-C` (a second `Ctrl-C` hard-exits the client).
 
-## Quickstart
+## Manual install
 
 This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`.
 
-### Manual Setup
-
-1. **Add the Unity package.** Use the Unity Package Manager (Window > Package Manager > Add by git URL) or edit `Packages/manifest.json` directly:
+1. **Add the Unity packages.** Use the Unity Package Manager (Window > Package Manager > Add by git URL) or edit `Packages/manifest.json` directly:
    ```json
    {
      "dependencies": {
-       "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"
+       "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git",
+       "com.lambda-labs.unity-agent-input": "https://github.com/LambdaLabsHQ/unity-agent-input.git",
+       "com.lambda-labs.unity-agent-vision": "https://github.com/LambdaLabsHQ/unity-agent-vision.git"
      }
    }
    ```
+   > Only `com.lambda-labs.unity-repl` is strictly required. If you prefer the minimal setup:
+   > ```json
+   > {
+   >   "dependencies": {
+   >     "com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"
+   >   }
+   > }
+   > ```
 
 2. **Register the skill.** This teaches your AI agent (Claude Code, Cursor, Codex CLI, etc.) how to use the REPL — call conventions, response formats, coroutine patterns, and ability discovery:
    ```bash
@@ -126,26 +146,6 @@ This package embeds the persistent REPL server seamlessly into your Unity Editor
    ```
 
 3. **Verify.** With the Unity Editor open, invoke the skill from your agent (e.g. `/unity-repl what is the Unity version`).
-
-**Optional companion packages.** These are _not_ required. If installed, they register additional abilities (input simulation, screenshots) via `ReplAbilityRegistry` that agents can discover at runtime:
-```json
-"com.lambda-labs.unity-agent-input": "https://github.com/LambdaLabsHQ/unity-agent-input.git",
-"com.lambda-labs.unity-agent-vision": "https://github.com/LambdaLabsHQ/unity-agent-vision.git"
-```
-
-### Agent Setup Prompt
-
-Copy and paste the following prompt to your AI agent to have it install Unity REPL for you:
-
-```
-Add `"com.lambda-labs.unity-repl": "https://github.com/LambdaLabsHQ/unity-repl.git"` to the `dependencies` in `Packages/manifest.json`.
-
-Then register the Unity REPL skill: try running `npx skills add ./Packages/com.lambda-labs.unity-repl`.
-
-If that fails (e.g. Node.js is not installed), the skill definition is at `./Packages/com.lambda-labs.unity-repl/.agents/skills/unity-repl/SKILL.md` — use your agent runtime's skill installer to register it.
-
-Finally, verify the REPL server is working by evaluating `Application.unityVersion` through the skill.
-```
 
 ### Non-interactive invocation
 
@@ -202,35 +202,25 @@ Alternatively, prepend `//!validate` as an inline directive in the source:
 EditorApplication.isPlaying = true
 ```
 
+## Requirements
+
+- **Unity 2021.3** or later
+- Editor-only — no runtime dependencies
+- Windows, macOS, Linux
+
 ## The Post-Tool AI Architecture
 
-> **REPL is the ultimate evolution of AI agent tooling. Meta-language abstraction is the highest form of tool calling.**
+> **Token is language. Language is evaluation. Evaluation is the universal tool.**
 
-For years, integrating AI agents with game engines meant building bridges: defining strict RPC schemas, rigid JSON wrappers, and highly constrained CLI commands. Every new AI capability required human engineers to meticulously expose a new "Tool." This created a profound architectural bottleneck—putting hyper-intelligent autonomous agents inside suffocating sandboxes.
+### The Death of the Tool Layer
 
-**Unity REPL shatters the sandbox.** 
+CLI is a meaningful step in the right direction. It moves AI systems toward more general-purpose interfaces and away from narrow, hand-authored RPC schemas. But it still stops one layer too early. A universal command surface is not enough; what agents ultimately need is a Turing-complete evaluator at the tool layer itself.
 
-We abandoned rigid MCP JSON-RPC servers. We obsoleted the restrictive Bash CLI wrappers that once claimed to replace them. We stripped away every translation layer. 
+Unity REPL provides that evaluator. The agent does not ask a server for permission to act, nor does it squeeze intent through a finite command vocabulary. It emits C#, and the engine evaluates it on the Main Thread. There is no tool registry to maintain, no schema to version, no wrapper to debug. The language *is* the interface.
 
-### Why Pure REPL is Superior to MCP
+### From Exploration to Crystallization
 
-1. **Zero Schema Overhead:** MCP servers suffocate context windows with hundreds of lines of rigid JSON schemas that AI agents must memorize and parse. Unity REPL requires zero schema mapping—its schema is the C# language itself.
-2. **Eradication of the Engineering Bottleneck:** In MCP, every time an agent needs a new capability, a human developer must write a new backend endpoint, compile it, and restart the server bridge. Unity REPL allows the agent to self-serve any capability immediately by just evaluating C#.
-3. **No Serialization Loss:** There is no need to serialize deeply nested Unity Object graphs into JSON datasets merely to pipe them into LLM context. You query the exact properties you need sequentially using native C# syntax.
-
-### Why Pure REPL is Superior to CLI Wrappers
-
-1. **Elimination of Parse/Match Logic:** CLI wrappers (like `unity-cli inspect --object=Player`) force developers to write brittle string-argument parsers. With REPL, the agent types `GameObject.Find("Player")`. The Unity Editor's C# compiler executes the tokens natively with zero interpretation loss.
-2. **Persistent Memory State:** Standard CLI commands invoke, load, execute, and die—losing state between calls. Our File IPC seamlessly taps into the *currently running* Unity Editor Main Thread without any spin-up cost, context dropping, or Editor reloading.
-
-### A Step Beyond Chrome MCP
-
-While leading architectures like Chrome DevTools MCP introduced powerful raw JS `evaluate` capabilities, they fundamentally remained hybrid models. They continued to force AI agents to navigate between rigid wrapped tools (e.g., `navigate()`, `click()`) and a secondary JavaScript sandbox. 
-
-Unity REPL commits fully to **Pure Meta-Language Interaction**. 
-- **Absolute Directness:** No API bridging or translation layers. The Unity C# compiler executes your tokens natively.
-- **Infinite Extensibility (Self-Authoring Tools):** You never wait for an engineer to expose an MCP tool. The AI can dynamically solidify complex multi-line REPL operations into permanent C# scripts and execute them directly later (e.g. `ExecuteMacro("build_scene.cs")`). The agent builds its own self-expanding toolbelt sequentially, with zero recompilation.
-- **Cognitive Consistency:** The AI's reasoning loop is entirely unified in C#, eliminating decision hesitation over "which tool to use".
+In a traditional tool architecture, discovery and execution are owned by separate teams: engineers build the tools, agents use them. With REPL, the agent owns both phases. It explores the Unity API interactively, distills a working pattern into a reusable C# script, and executes that script later without any recompilation or human intervention. The toolbelt is not installed — it is authored in flight.
 
 ### Architecture
 
