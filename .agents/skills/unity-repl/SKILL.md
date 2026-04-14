@@ -211,9 +211,43 @@ Do not use legacy tools. Query properties or modify systems by authoring tempora
 | Get error count | `var m = typeof(UnityEditor.LogEntries).GetMethod("GetCount", System.Reflection.BindingFlags.Static\|System.Reflection.BindingFlags.Public); m.Invoke(null,null)` |
 | Take Screenshot | `ScreenCapture.CaptureScreenshot("/tmp/shot.png")` |
 
-## Installed Agent Packages
+## Installed Abilities
 
-If any `unity-agent-*` packages are installed in this project, their tool docs are
-available at `Temp/UnityReplIpc/extensions.md` (regenerated on every domain reload).
+`unity-agent-*` packages register themselves as **abilities** with
+`ReplAbilityRegistry` at domain reload. Each ability ships a short description
+and a full markdown doc. Discover in two tiers — summary first, full doc on demand.
 
-Read them from REPL: `System.IO.File.ReadAllText("Temp/UnityReplIpc/extensions.md")`
+### Tier 1 — list what's installed (cheap, always do this first)
+
+```csharp
+string.Join("\n", LambdaLabs.UnityRepl.Editor.ReplAbilityRegistry.ListAbilities()
+    .Select(a => $"{a.Name} — {a.Description}"))
+```
+
+Each line is `<package-name> — <one-sentence description>`. Empty output → no
+abilities installed; use only the base Unity API. Otherwise note which abilities
+look relevant to the task.
+
+### Tier 2 — load the full doc for one ability
+
+```csharp
+LambdaLabs.UnityRepl.Editor.ReplAbilityRegistry.GetAbility(
+    "com.lambda-labs.unity-agent-input").Doc
+```
+
+Returns the full markdown (tables, method signatures, constraints). `GetAbility`
+returns `null` for unknown names. Do **not** fetch every ability — only the ones
+whose Tier 1 description matches your task.
+
+### Non-REPL access
+
+State is mirrored to disk on every register:
+
+```
+Temp/UnityReplIpc/abilities/
+  index.json          ← [{name, description, version?}, ...]
+  <ability-name>.md   ← one file per ability (full Doc body)
+```
+
+External tools (skill layer, CI scripts) can read these directly without going
+through the REPL.
