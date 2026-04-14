@@ -117,7 +117,7 @@ Setup.ComplexSetup()
 - Set the client env var `TIMEOUT_S` to extend how long `repl.sh`/`repl.bat` wait for `.res` (align with your `//!timeout=`).
 - Drop an empty file at `Temp/UnityReplIpc/Requests/{uuid}.cancel` to abort a running coroutine. `repl.sh` does this automatically on the first `Ctrl-C` (a second `Ctrl-C` hard-exits the client).
 
-## Manual install
+## Manual Install
 
 This package embeds the persistent REPL server seamlessly into your Unity Editor workflow via `InitializeOnLoad`.
 
