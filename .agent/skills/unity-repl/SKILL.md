@@ -106,8 +106,10 @@ When an eval expression returns an `IEnumerator`, the REPL **auto-drives it acro
 
 Wrap the coroutine in a `public static class` (Mono.CSharp doesn't accept top-level method declarations). Use `System.Collections.IEnumerator` fully qualified to disambiguate from `System.Collections.Generic.IEnumerator<T>`.
 
+**Call 1 — define the coroutine** (persists until domain reload):
+
 ```csharp
-// Step 1: define the coroutine (persists until domain reload)
+// demo_countdown.cs
 public static class Demo {
     public static System.Collections.IEnumerator CountDown() {
         Debug.Log("3");
@@ -118,13 +120,19 @@ public static class Demo {
         yield return "done";
     }
 }
-
-// Step 2: invoke. Return value is IEnumerator → REPL pumps it until completion.
-// The .res response arrives after the coroutine finishes (~2s here) with "done".
-Demo.CountDown()
 ```
 
-Ship both steps as one file via `repl.sh -f scenario.cs` — the last expression is the invocation, and the whole file evaluates as a single unit.
+```bash
+./repl.sh -f demo_countdown.cs
+```
+
+**Call 2 — invoke.** Return value is `IEnumerator` → REPL pumps it until completion. The `.res` response arrives after the coroutine finishes (~2 s here) with `"done"`.
+
+```bash
+./repl.sh -e 'Demo.CountDown()'
+```
+
+**Important:** Always split class definitions and their invocations into two separate REPL calls. The compiler treats each input as a single compilation unit — mixing a declaration with a trailing expression in one call causes a compile error.
 
 ### Supported yield instructions
 
@@ -149,12 +157,13 @@ Ship both steps as one file via `repl.sh -f scenario.cs` — the last expression
 
 ### Timeout override
 
-First-line directive inside the file:
+First-line directive inside the class-definition file:
 ```csharp
 //!timeout=30s
 public static class Slow { public static System.Collections.IEnumerator Go() { ... } }
-Slow.Go()
 ```
+Then invoke separately: `./repl.sh --timeout 30 -e 'Slow.Go()'`
+
 Also accepts `//!timeout=2m` or `//!timeout=5000` (bare ms). Align client `--timeout` / `TIMEOUT_S` env var to match.
 
 ### Pitfalls
@@ -162,6 +171,7 @@ Also accepts `//!timeout=2m` or `//!timeout=5000` (bare ms). Align client `--tim
 - **Domain reload wipes defined classes.** Entering/exiting Play Mode triggers a reload — any `public static class Foo {}` you defined needs to be re-sent. Keep coroutine definitions in a `.cs` file and replay via `repl.sh -f` after reload.
 - **`yield` at top level is illegal** (Mono.CSharp doesn't support local functions). Always wrap: `public static class X { public static System.Collections.IEnumerator Y() { ... } }`.
 - **Top-level method declarations fail** with `CS1525: Unexpected symbol '('` even when prefixed with modifiers. The wrapper class is required.
+- **One declaration per call.** Each REPL input is compiled as a single unit. Mixing a class/using declaration with a trailing expression (e.g. `class Foo {} new Foo().x`) causes a compile error. Always split: define in one call, invoke in the next.
 
 ## Snippets & Reference
 

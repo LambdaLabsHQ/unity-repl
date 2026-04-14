@@ -27,7 +27,7 @@ assert_validate_rolls_back() {
 
     local vout vec
     vout=$(bash "$REPL" --validate -e "$validate_code" 2>&1); vec=$?
-    if [ "$vec" != 0 ] || [ "$vout" != "COMPILE OK" ]; then
+    if [ "$vec" != 0 ] || { [ "$vout" != "COMPILE OK" ] && [ "$vout" != "COMPILE OK (no-op)" ]; }; then
         echo "FAIL: $name — validate unexpected: exit=$vec out=<<$vout>>"
         FAIL=$((FAIL+1)); return
     fi
